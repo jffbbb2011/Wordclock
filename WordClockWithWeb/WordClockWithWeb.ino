@@ -9,6 +9,7 @@
 // ###########################################################################################################################################
 // # [FORK] Fork of jffbbb2011 (based on N1cls V6.1.0). Own version numbers have 4 parts (V6.1.0.1, V6.1.0.2, ...), see
 // #   parseVersion() / compareVersions(). The update source is UPDATE_REPO in settings.h. Changes are marked "[FORK]" or "[V2]".
+// # [FORK] V6.1.0.2: WiFi reset button (BUTTON_PIN / BUTTON_HOLD_MS in settings.h): checkResetButton() is called from serviceDelay().
 // #
 // # [V2] CHANGES compared to the original WordClockWithWeb.ino:
 // # - Temperature / humidity: the old text style 2 "two lines" (big 5x7 number + small unit) is replaced by
@@ -98,7 +99,7 @@ SET_LOOP_TASK_STACK_SIZE(24 * 1024);
 // ###########################################################################################################################################
 // # Version number of the code:
 // ###########################################################################################################################################
-const char* WORD_CLOCK_VERSION = "V6.1.0.1";  // [FORK] was "V6.1.0". The release tag on GitHub must be exactly this text.
+const char* WORD_CLOCK_VERSION = "V6.1.0.2";  // [FORK] was "V6.1.0". The release tag on GitHub must be exactly this text. (V6.1.0.1 -> V6.1.0.2: WiFi reset button)
 
 
 // ###########################################################################################################################################
@@ -414,6 +415,7 @@ void setup() {
   Serial.println(" (" CHIP_NAME ")");
   Serial.println("######################################################################");
   readEEPROM();                     // get persistent data from EEPROM (and the pins)
+  setupResetButton();               // [FORK] WiFi reset button (pin check + pull-up)
   pixels.setPin(hw.ledPin);         // LED pin from the configuration page
   pixels.begin();                   // Init the NeoPixel library
   dunkel();                         // Switch display black
@@ -780,6 +782,7 @@ void serviceDelay(unsigned long ms) {
   unsigned long start = millis();
   do {
     checkClient();
+    checkResetButton();  // [FORK] WiFi reset button, polled every ~5 ms
     delay(5);
   } while (millis() - start < ms);
 }
@@ -2073,6 +2076,60 @@ void ClockWifiReset() {  // Called by the REST function /clockwifireset and by t
   Serial.println("####################################################################################################");
   delay(3000);
   ESP.restart();
+}
+
+
+// ###########################################################################################################################################
+// # [FORK] WiFi reset button (V6.1.0.2): hold BUTTON_PIN to GND for BUTTON_HOLD_MS -> ClockWifiReset() (deletes the WiFi data, restarts,
+// # opens the hotspot). Wiring: push button between BUTTON_PIN and GND, no resistor (internal pull-up). Settings: see settings.h.
+// ###########################################################################################################################################
+bool buttonEnabled = false;          // false if BUTTON_PIN = -1 or the pin is used for something else
+bool buttonDown = false;             // button is currently held
+unsigned long buttonDownSince = 0;   // millis() when the button was pressed
+int buttonCorners = 0;               // how many corner LEDs are lit as a warning
+unsigned long buttonLastShow = 0;    // millis() of the last warning display
+
+void setupResetButton() {
+  // The pin must exist and must not be one of the pins configured on the configuration page (LED strip, RTC):
+  buttonEnabled = (BUTTON_PIN >= 0) && validPin(BUTTON_PIN) && BUTTON_PIN != hw.ledPin && BUTTON_PIN != hw.sdaPin && BUTTON_PIN != hw.sclPin;
+  if (buttonEnabled) {
+    pinMode(BUTTON_PIN, INPUT_PULLUP);
+    Serial.println("WiFi reset button: pin " + String(BUTTON_PIN) + ", hold " + String(BUTTON_HOLD_MS / 1000) + " s to reset the WiFi");
+  } else {
+    Serial.println("WiFi reset button: switched off (BUTTON_PIN not set or used for the LEDs / RTC)");
+  }
+}
+
+void checkResetButton() {  // Called every ~5 ms from serviceDelay()
+  if (!buttonEnabled) return;
+  if (digitalRead(BUTTON_PIN) == HIGH) {  // not pressed (pull-up). A released button cancels everything:
+    buttonDown = false;
+    buttonCorners = 0;
+    return;
+  }
+  unsigned long now = millis();
+  if (!buttonDown) {  // button just pressed
+    buttonDown = true;
+    buttonDownSince = now;
+    buttonCorners = 0;
+    return;
+  }
+  unsigned long held = now - buttonDownSince;
+  if (held >= BUTTON_HOLD_MS) {  // held long enough: reset the WiFi (does not return, the clock restarts)
+    buttonDown = false;
+    Serial.println("WiFi reset button held for " + String(BUTTON_HOLD_MS / 1000) + " s - resetting the WiFi...");
+    ClockWifiReset();
+    return;
+  }
+  // Warning while holding: one more corner LED every BUTTON_HOLD_MS / 5 (the main loop redraws the display, so refresh it every 200 ms)
+  int corners = (int)(held / (BUTTON_HOLD_MS / 5));
+  if (corners > 4) corners = 4;
+  if (corners > 0 && (corners != buttonCorners || now - buttonLastShow > 200)) {
+    buttonCorners = corners;
+    buttonLastShow = now;
+    for (int i = 0; i < corners; i++) setLED(110 + i, 110 + i, 1);  // corner LEDs 110..113
+    pixels.show();
+  }
 }
 
 

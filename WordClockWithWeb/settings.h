@@ -40,31 +40,42 @@
 #define PIN 2
 #define SDA_PIN 8
 #define SCL_PIN 9
+#define BUTTON_PIN 4  // [FORK] WiFi reset button, see BUTTON_HOLD_MS below
 #elif defined(CONFIG_IDF_TARGET_ESP32C3)
 #define CHIP_NAME "ESP32-C3"
 #define CHIP_FILE_ID "ESP32C3"
 #define PIN 10
 #define SDA_PIN 8
 #define SCL_PIN 9
+#define BUTTON_PIN 4  // [FORK] WiFi reset button, see BUTTON_HOLD_MS below
 #elif defined(CONFIG_IDF_TARGET_ESP32)
 #define CHIP_NAME "ESP32"
 #define CHIP_FILE_ID "ESP32"
 #define PIN 16
 #define SDA_PIN 21
 #define SCL_PIN 22
+#define BUTTON_PIN 4  // [FORK] WiFi reset button, see BUTTON_HOLD_MS below
 #elif defined(ESP32)  // Other ESP32 variants: no ready-made update file in the releases
 #define CHIP_NAME CONFIG_IDF_TARGET
 #define CHIP_FILE_ID CONFIG_IDF_TARGET
 #define PIN 2
 #define SDA_PIN SDA
 #define SCL_PIN SCL
+#define BUTTON_PIN 4  // [FORK] WiFi reset button, see BUTTON_HOLD_MS below
 #else  // ESP8266: NodeMCU or D1 mini
 #define CHIP_NAME "ESP8266"
 #define CHIP_FILE_ID "ESP8266"
 #define PIN D6               // Arduino-Pin connected to the NeoPixels
 #define SDA_PIN D2
 #define SCL_PIN D1
+#define BUTTON_PIN D5  // [FORK] WiFi reset button, see BUTTON_HOLD_MS below
 #endif
+
+// [FORK] WiFi reset button (new in V6.1.0.2): connect a (SMD) push button between BUTTON_PIN and GND. No resistor is needed, the internal
+// [FORK] pull-up is used. Hold the button for BUTTON_HOLD_MS: the clock deletes the saved WiFi data and restarts, then it opens the
+// [FORK] hotspot "WordClock" so the WiFi can be configured again. While holding, the 4 corner LEDs light up one after another as a warning.
+// [FORK] BUTTON_PIN = -1 switches the button off. ESP8266: D5 (GPIO14). ESP32 / S3 / C3: GPIO 4. Avoid the boot pins (GPIO0, GPIO2, GPIO15 ...).
+#define BUTTON_HOLD_MS 5000  // [FORK] hold time in milliseconds
 
 
 // ###########################################################################################################################################
