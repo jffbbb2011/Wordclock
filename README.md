@@ -2,7 +2,7 @@
 
 This is the <b>WordClock</b> software to the thingiverse project: <a href="https://www.thingiverse.com/thing:4693081">Wordclock Wortuhr</a>. Also available for download on <a href="https://www.printables.com/de/model/311949-wordclock-2022">Prusa Printables</a>.
 
-Feel free to add functions, ideas and everything else, which helps this project to grow! 
+Feel free to  add functions, ideas and everything else, which helps this project to grow! 
 
 
 <hr>
