@@ -422,6 +422,7 @@ a{color:var(--accent)}
             <div class="slider w"><label for="dateSpeed" data-t="speed"></label><input type="range" id="dateSpeed" min="40" max="400" step="10" data-k="txt.dateSpeed" data-type="num"><output id="dateSpeedOut" for="dateSpeed"></output></div>
             <div class="rows">
               <label class="row" for="dateYear"><span class="rt"><b data-t="year"></b><small data-t="yearSub"></small></span><input type="checkbox" class="sw" id="dateYear" data-k="txt.dateYear"></label>
+              <div class="row"><span class="rt"><b data-t="dsep"></b><small data-t="dsepSub"></small></span><span class="inline"><select class="ivsel" id="dateSep" data-k="txt.dateSep" data-type="num"><option value="0">.</option><option value="1">,</option><option value="2">-</option><option value="3">/</option></select></span></div>
             </div>
           </div>
           <div class="group">
@@ -615,7 +616,7 @@ const mock = {
     color: "#00ff00", rainbow: 0, bright: 42, brightNight: 21, psu: false,
     night: 0, nightDays: [[22,6],[22,6],[22,6],[22,6],[23,6],[23,7],[22,6]],
     lang: 0, deSpecial: 0, blink: false, date: false, dateInt: 60, temp: false, tempInt: 300, hum: false, humInt: 300,
-    txt: { dateStyle: 0, tempStyle: 0, humStyle: 0, dateSpeed: 150, tempSpeed: 150, humSpeed: 150, hold: 2000, tempDec: true, dateYear: true },
+    txt: { dateStyle: 0, tempStyle: 0, humStyle: 0, dateSpeed: 150, tempSpeed: 150, humSpeed: 150, hold: 2000, tempDec: true, dateYear: true, dateSep: 0 },
     bootText: true, boot1: "COMPANY", boot2: "NAME", minMode: 0, minOrder: "3,4,1,2",
     ledTest: true, setWlan: true, showIp: true,
     ntp: "de.pool.ntp.org", tz: "CET-1CEST,M3.5.0/02,M10.5.0/03",
@@ -698,6 +699,8 @@ const T = {
     hold: "Pause",
     gHold: "Pausen",
     holdHint: "So lange bleibt eine Seite oder ein angehaltener Text stehen. Wirkt nur bei den Stilen „Mit Pausen“, „Seiten“ und „Kompakt“.",
+    dsep: "Trennzeichen Datum",
+    dsepSub: "Nur bei Laufschrift: Punkt, Komma, Bindestrich oder Schrägstrich.",
     year: "Jahr anzeigen",
     yearSub: "Zeigt nach Tag und Monat auch das Jahr.",
     dec: "Nachkommastelle",
@@ -809,6 +812,8 @@ const T = {
     hold: "Pause",
     gHold: "Pauses",
     holdHint: "How long a page or a stopped text stays. Only used by the styles “With stops”, “Pages” and “Compact”.",
+    dsep: "Date separator",
+    dsepSub: "Scroll style only: dot, comma, hyphen or slash.",
     year: "Show year",
     yearSub: "Shows the year after day and month.",
     dec: "Decimal",
@@ -920,6 +925,8 @@ const T = {
     hold: "Pausa",
     gHold: "Pausas",
     holdHint: "Cuánto tiempo se queda una página o un texto detenido. Solo se usa en los estilos «Con pausas», «Páginas» y «Compacto».",
+    dsep: "Separador de la fecha",
+    dsepSub: "Solo en desplazamiento: punto, coma, guion o barra.",
     year: "Mostrar el año",
     yearSub: "Muestra el año después del día y el mes.",
     dec: "Decimal",
@@ -1193,7 +1200,8 @@ const BAR_TEMP_MIN = 10, BAR_TEMP_MAX = 35;  // [V2] same as TXT_BAR_TEMP_MIN / 
 const pv = { kind: "date", temp: 21.5, hum: 65, timer: null, lang: -1 };
 const pvCells = [];
 
-const pvAdv = c => c === "." ? 1 : c === "C" ? 5 : 6;
+// [V4] date separators = placeholder characters \u0001 dot, \u0002 comma, \u0003 hyphen, \u0004 slash (same as in the firmware)
+const pvAdv = c => c === "\u0001" ? 2 : c === "\u0002" ? 3 : (c === "\u0003" || c === "\u0004") ? 4 : c === "." ? 1 : c === "C" ? 5 : 6;
 const pvWidth = s => { let w = 0; for (const c of s) w += pvAdv(c); return w ? w - 1 : 0; };
 const pvBlank = () => Array.from({ length: 10 }, () => new Array(11).fill(0));
 function pvPut(b, x, y, rows) {  // y = bottom row (0 = bottom of the panel), rows are listed top first
@@ -1204,7 +1212,15 @@ function pvPut(b, x, y, rows) {  // y = bottom row (0 = bottom of the panel), ro
   });
 }
 function pvDraw(b, s, x, y) {
-  for (const c of s) { if (c === ".") pvPut(b, x - 1, y, ["X"]); else pvPut(b, x, y, GLYPH[c]); x += pvAdv(c); }
+  for (const c of s) {
+    if (c === ".") pvPut(b, x - 1, y, ["X"]);
+    else if (c === "\u0001") pvPut(b, x, y, ["X"]);
+    else if (c === "\u0002") pvPut(b, x, y - 1, [".X", "X."]);
+    else if (c === "\u0003") pvPut(b, x, y + 3, ["XXX"]);
+    else if (c === "\u0004") pvPut(b, x, y, ["..X", "..X", ".X.", ".X.", ".X.", "X..", "X.."]);
+    else pvPut(b, x, y, GLYPH[c]);
+    x += pvAdv(c);
+  }
 }
 const pvFrame = (s, x, y) => { const b = pvBlank(); pvDraw(b, s, x, y); return b; };
 function pvScroll(out, s, speed) { const w = pvWidth(s); for (let x = 10; x >= -w; x--) out.push([pvFrame(s, x, 2), speed]); }
@@ -1254,7 +1270,7 @@ function pvBuild() {
   const x = cfg.txt, out = [], rnd = v => Math.sign(v) * Math.round(Math.abs(v));
   if (pv.kind === "date") {
     const d = new Date(), dd = pad(d.getDate()), mm = pad(d.getMonth() + 1), yy = String(d.getFullYear()).padStart(4, "0");
-    if (x.dateStyle === 0) pvScroll(out, x.dateYear ? `${dd}.${mm}.${yy}` : `${dd}.${mm}.`, x.dateSpeed);
+    if (x.dateStyle === 0) { const sp = ["\u0001", "\u0002", "\u0003", "\u0004"][(x.dateSep | 0) & 3]; pvScroll(out, x.dateYear ? `${dd}${sp}${mm}${sp}${yy}` : ((x.dateSep | 0) === 0 ? `${dd}${sp}${mm}${sp}` : `${dd}${sp}${mm}`), x.dateSpeed); }
     else { pvSegment(out, dd, x.dateStyle, x.dateSpeed, x.hold); pvSegment(out, mm, x.dateStyle, x.dateSpeed, x.hold); if (x.dateYear) pvSegment(out, yy, x.dateStyle, x.dateSpeed, x.hold); }
   } else if (pv.kind === "temp") {
     const tx10 = rnd(pv.temp * 10), numInt = String(rnd(pv.temp));
@@ -1670,7 +1686,7 @@ async function init() {
   try {
     const data = await api.load();
     cfg = data.cfg; st = data.status;
-    if (!cfg.txt) cfg.txt = { dateStyle: 0, tempStyle: 0, humStyle: 0, dateSpeed: 150, tempSpeed: 150, humSpeed: 150, hold: 2000, tempDec: true, dateYear: true };  // older firmware
+    if (!cfg.txt) cfg.txt = { dateStyle: 0, tempStyle: 0, humStyle: 0, dateSpeed: 150, tempSpeed: 150, humSpeed: 150, hold: 2000, tempDec: true, dateYear: true, dateSep: 0 };  // older firmware
     saved = clone(cfg);
   } catch (e) { toast(t("loadErr")); return; }
   L = ["de", "en", "es"][cfg.lang] || "de";

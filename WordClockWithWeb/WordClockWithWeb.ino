@@ -99,7 +99,8 @@ SET_LOOP_TASK_STACK_SIZE(24 * 1024);
 // ###########################################################################################################################################
 // # Version number of the code:
 // ###########################################################################################################################################
-const char* WORD_CLOCK_VERSION = "V6.1.0.2";  // [FORK] was "V6.1.0". The release tag on GitHub must be exactly this text. (V6.1.0.1 -> V6.1.0.2: WiFi reset button)
+const char* WORD_CLOCK_VERSION = "V6.1.0.4";  // [V4 CHANGE 5] was "V6.1.0.3" - date separator setting. Older notes:  // [V3 CHANGE 4] was "V6.1.0.2" - must be exactly the GitHub release tag. V6.1.0.3 = fix: temperature / humidity / date timers (see V3 CHANGE 1-3).
+// [FORK] previous note:  // [FORK] was "V6.1.0". The release tag on GitHub must be exactly this text. (V6.1.0.1 -> V6.1.0.2: WiFi reset button)
 
 
 // ###########################################################################################################################################
@@ -252,7 +253,8 @@ struct txtRec {
   uint8_t humStyle;   // same as tempStyle (0..3)
   uint8_t tempDec;    // 1 = temperature with one decimal (scroll styles)
   uint8_t dateYear;   // 1 = show the year
-  uint8_t reserved[3];
+  uint8_t dateSep;    // [V4 CHANGE 1] date separator in the scroll style: 0 = ".", 1 = ",", 2 = "-", 3 = "/" (was a reserved byte, so old EEPROM data stays valid = 0 = ".")
+  uint8_t reserved[2];
   uint16_t dateSpeed;  // milliseconds per column (smaller = faster)
   uint16_t tempSpeed;
   uint16_t humSpeed;
@@ -267,7 +269,8 @@ void txtDefaults() {
   txt.dateStyle = txt.tempStyle = txt.humStyle = 0;
   txt.tempDec = 1;
   txt.dateYear = 1;
-  txt.reserved[0] = txt.reserved[1] = txt.reserved[2] = 0;
+  txt.dateSep = 0;  // [V4 CHANGE 1]
+  txt.reserved[0] = txt.reserved[1] = 0;
   txt.dateSpeed = txt.tempSpeed = txt.humSpeed = 150;
   txt.holdMs = 2000;
 }
@@ -667,7 +670,7 @@ void readEEPROM() {
 
   // Floating text settings (styles, speeds), use the defaults if none are stored yet:
   EEPROM.get(TXT_OFFSET, txt);
-  if (txt.magic != TXT_MAGIC || txt.dateStyle > 2 || txt.tempStyle > 3 || txt.humStyle > 3 ||  /* [V2] 3 = compact + bar */ txt.dateSpeed < 30 || txt.dateSpeed > 600 || txt.tempSpeed < 30 || txt.tempSpeed > 600 || txt.humSpeed < 30 || txt.humSpeed > 600 || txt.holdMs < 300 || txt.holdMs > 6000) txtDefaults();
+  if (txt.magic != TXT_MAGIC || txt.dateStyle > 2 || txt.dateSep > 3 /* [V4 CHANGE 1] */ || txt.tempStyle > 3 || txt.humStyle > 3 ||  /* [V2] 3 = compact + bar */ txt.dateSpeed < 30 || txt.dateSpeed > 600 || txt.tempSpeed < 30 || txt.tempSpeed > 600 || txt.humSpeed < 30 || txt.humSpeed > 600 || txt.holdMs < 300 || txt.holdMs > 6000) txtDefaults();
 }
 
 
@@ -1183,6 +1186,27 @@ void printSymbolAt(char symbol, int x, int y) {
     case '.':  // Decimal point
       setLED(ledXY(x, y), ledXY(x, y), -1);
       break;
+
+    // [V4 CHANGE 2] Date separators, drawn at x = the column AFTER the empty column behind the digit (x counts from the left of the glyph):
+    case '\x01':  // dot, one pixel away from the digit
+      setLED(ledXY(x, y), ledXY(x, y), -1);
+      break;
+
+    case '\x02':  // comma: dot + tail down-left
+      setLED(ledXY(x + 1, y), ledXY(x + 1, y), -1);
+      setLED(ledXY(x, y - 1), ledXY(x, y - 1), -1);
+      break;
+
+    case '\x03':  // hyphen (3 wide, middle of the 7 rows)
+      setLEDLine(x, x + 2, y + 3, -1);
+      break;
+
+    case '\x04':  // slash (3 wide, rises to the right)
+      for (int yd = 0; yd <= 6; yd++) {
+        int xd = (yd <= 1) ? 0 : (yd <= 4) ? 1 : 2;
+        setLED(ledXY(x + xd, y + yd), ledXY(x + xd, y + yd), -1);
+      }
+      break;
   }
 }
 
@@ -1198,7 +1222,12 @@ void printSymbolAt(char symbol, int x, int y) {
 const int TXT_VIS = 11;  // visible columns of the panel
 
 // Advance (columns) per character: digits and symbols are 5 wide + 1 gap. The decimal point sits in the gap of the character before it.
+// [V4 CHANGE 2] Date separators (placeholder characters, so the temperature decimal point '.' is NOT changed): each one has ONE EMPTY column
+// before it (the 6th column of the digit) and one after it:  \x01 = dot (1 col), \x02 = comma (2 cols), \x03 = hyphen (3 cols), \x04 = slash (3 cols).
 int txtAdv(char c) {
+  if (c == '\x01') return 2;
+  if (c == '\x02') return 3;
+  if (c == '\x03' || c == '\x04') return 4;
   if (c == '.') return 1;
   if (c == 'C') return 5;
   return 6;
@@ -1425,8 +1454,12 @@ void showCurrentDate() {
   snprintf(yy, sizeof(yy), "%04d", year % 10000);
   if (style == 0) {
     char buf[24];
-    if (txt.dateYear) snprintf(buf, sizeof(buf), "%s.%s.%s", dd, mm, yy);
-    else snprintf(buf, sizeof(buf), "%s.%s.", dd, mm);
+    // [V4 CHANGE 3] separator selectable (dot / comma / hyphen / slash); a trailing separator without year only for the dot ("21.10.")
+    const char sepChars[4] = { '\x01', '\x02', '\x03', '\x04' };
+    char sp = sepChars[txt.dateSep & 3];
+    if (txt.dateYear) snprintf(buf, sizeof(buf), "%s%c%s%c%s", dd, sp, mm, sp, yy);
+    else if (txt.dateSep == 0) snprintf(buf, sizeof(buf), "%s%c%s%c", dd, sp, mm, sp);
+    else snprintf(buf, sizeof(buf), "%s%c%s", dd, sp, mm);
     txtScrollThrough(buf, speed);
   } else {
     txtShowSegment(dd, style, speed);
@@ -1440,11 +1473,13 @@ void showCurrentDate() {
 // ###########################################################################################################################################
 // # Show current temperature on clock - reads the GY-21 / HTU21D sensor once before showing:
 // ###########################################################################################################################################
-void showCurrentTemp() {
-  if (!checkHTU()) return;  // Sensor not available - skip silently
+// [V3 CHANGE 1] Now returns bool (true = value was shown, false = sensor not ready / faulty reading) so that ShowTheTime() can retry
+// after a few seconds instead of losing the whole interval (before: a failed read meant no temperature for 5 min, 1 h, ...).
+bool showCurrentTemp() {
+  if (!checkHTU()) return false;  // Sensor not available
 
   float t = htu.readTemperature();
-  if (isnan(t)) return;  // Faulty reading - skip this cycle, will retry next interval
+  if (isnan(t)) return false;  // Faulty reading
 
   Serial.print("Showing current temperature: ");
   Serial.print(t);
@@ -1457,17 +1492,18 @@ void showCurrentTemp() {
   snprintf(numDec, sizeof(numDec), "%s%d.%d", tx10 < 0 ? "-" : "", abs(tx10) / 10, abs(tx10) % 10);
   txtShowValue(txt.tempStyle, txt.tempSpeed, txt.tempDec ? numDec : numInt, numInt, 'C', t);  // [V2] + raw value for the bar
   txtBlank();
+  return true;  // [V3 CHANGE 1]
 }
 
 
 // ###########################################################################################################################################
 // # Show current humidity on clock - reads the GY-21 / HTU21D sensor once before showing:
 // ###########################################################################################################################################
-void showCurrentHumidity() {
-  if (!checkHTU()) return;  // Sensor not available - skip silently
+bool showCurrentHumidity() {  // [V3 CHANGE 1] returns bool, see showCurrentTemp()
+  if (!checkHTU()) return false;  // Sensor not available
 
   float h = htu.readHumidity();
-  if (isnan(h)) return;  // Faulty reading - skip this cycle, will retry next interval
+  if (isnan(h)) return false;  // Faulty reading
 
   Serial.print("Showing current humidity: ");
   Serial.print(h);
@@ -1480,6 +1516,7 @@ void showCurrentHumidity() {
   snprintf(num, sizeof(num), "%d", humInt);
   txtShowValue(txt.humStyle, txt.humSpeed, num, num, '%', (float)humInt);  // [V2] + raw value for the bar
   txtBlank();
+  return true;  // [V3 CHANGE 1]
 }
 
 
@@ -1732,34 +1769,51 @@ void showDCW() {
 // ###########################################################################################################################################
 // # Display the time:
 // ###########################################################################################################################################
+// [V3 CHANGE 2] The three timers were "static" inside ShowTheTime() and were NEVER touched when the settings were saved on the web page.
+// Consequences: a new interval only became active after the OLD interval had run out (e.g. 1 h -> 1 min: up to 1 h of waiting), and a
+// temperature / humidity switched on later appeared at a random moment (the timer had kept running while it was switched off).
+// Now they are global and resetAutoShowTimers() restarts them when the web page saves the settings.
+unsigned long nextDateShowMillis = 0;
+unsigned long nextTempShowMillis = 0;
+unsigned long nextHumidityShowMillis = 0;
+bool autoShowInit = false;
+
+void resetAutoShowTimers() {
+  nextDateShowMillis = millis() + (unsigned long)max(showDateIntervalSec, 5) * 1000UL;
+  nextTempShowMillis = millis() + (unsigned long)max(showTempIntervalSec, 5) * 1000UL;
+  nextHumidityShowMillis = millis() + (unsigned long)max(showHumidityIntervalSec, 5) * 1000UL;
+  autoShowInit = true;
+}
+
+// [V3 CHANGE 3] Next point in time = scheduled time + interval (before: end of the animation + interval, so the real period was
+// interval + duration of the animation, e.g. 60 s + 8 s). If the clock is already behind (e.g. several screens due at once or the
+// night mode was active), it starts a new interval from now instead of showing several screens in a row.
+unsigned long nextAutoShow(unsigned long scheduled, int intervalSec) {
+  unsigned long interval = (unsigned long)max(intervalSec, 5) * 1000UL;
+  unsigned long next = scheduled + interval;
+  if ((long)(millis() - next) >= 0) next = millis() + interval;
+  return next;
+}
+
 void ShowTheTime() {
   // Date / temperature / humidity are each shown on their own timer (millis() based, ">=" comparison), so a screen is never
   // skipped even though every animation blocks the loop for several seconds.
-  static bool autoShowInit = false;
-  static unsigned long nextDateShowMillis = 0;
-  static unsigned long nextTempShowMillis = 0;
-  static unsigned long nextHumidityShowMillis = 0;
-  if (!autoShowInit) {
-    autoShowInit = true;
-    nextDateShowMillis = millis() + (unsigned long)max(showDateIntervalSec, 5) * 1000UL;
-    nextTempShowMillis = millis() + (unsigned long)max(showTempIntervalSec, 5) * 1000UL;
-    nextHumidityShowMillis = millis() + (unsigned long)max(showHumidityIntervalSec, 5) * 1000UL;
-  }
+  if (!autoShowInit) resetAutoShowTimers();
 
   if (showDate && (long)(millis() - nextDateShowMillis) >= 0) {
+    nextDateShowMillis = nextAutoShow(nextDateShowMillis, showDateIntervalSec);  // [V3 CHANGE 3] set BEFORE the animation
     showCurrentDate();
-    nextDateShowMillis = millis() + (unsigned long)max(showDateIntervalSec, 5) * 1000UL;
   }
   if (showTemp && (long)(millis() - nextTempShowMillis) >= 0) {
-    showCurrentTemp();
-    nextTempShowMillis = millis() + (unsigned long)max(showTempIntervalSec, 5) * 1000UL;
+    nextTempShowMillis = nextAutoShow(nextTempShowMillis, showTempIntervalSec);
+    if (!showCurrentTemp()) nextTempShowMillis = millis() + 10000UL;  // [V3 CHANGE 1] sensor not ready: retry in 10 s
   }
   if (showHumidity && (long)(millis() - nextHumidityShowMillis) >= 0) {
-    showCurrentHumidity();
-    nextHumidityShowMillis = millis() + (unsigned long)max(showHumidityIntervalSec, 5) * 1000UL;
+    nextHumidityShowMillis = nextAutoShow(nextHumidityShowMillis, showHumidityIntervalSec);
+    if (!showCurrentHumidity()) nextHumidityShowMillis = millis() + 10000UL;  // [V3 CHANGE 1] sensor not ready: retry in 10 s
   }
 
-  // Manual "Show now" buttons on the web configuration page:
+  // Manual "Show now" buttons on the web configuration page (they restart the timer of that screen):
   if (triggerShowDateNow) {
     triggerShowDateNow = false;
     showCurrentDate();
@@ -2850,6 +2904,7 @@ void handleApiState() {
   tx["hold"] = txt.holdMs;
   tx["tempDec"] = txt.tempDec != 0;
   tx["dateYear"] = txt.dateYear != 0;
+  tx["dateSep"] = txt.dateSep;  // [V4 CHANGE 4]
   c["bootText"] = useBootText != 0;
   c["boot1"] = bootText1;
   c["boot2"] = bootText2;
@@ -2958,6 +3013,7 @@ void handleApiConfig() {
   int holdMs = constrain((int)(tx["hold"] | txt.holdMs), 300, 6000);
   bool tempDec = tx["tempDec"] | (txt.tempDec != 0);
   bool dateYear = tx["dateYear"] | (txt.dateYear != 0);
+  int dateSep = constrain((int)(tx["dateSep"] | txt.dateSep), 0, 3);  // [V4 CHANGE 4]
   bool bootOn = c["bootText"] | (useBootText != 0);
   String boot1 = bootText1, boot2 = bootText2;
   if (c["boot1"].is<const char*>()) boot1 = cleanBootText(c["boot1"].as<const char*>());
@@ -3030,7 +3086,7 @@ void handleApiConfig() {
   showTempIntervalSec = tempInt;
   showHumidity = hum ? -1 : 0;
   showHumidityIntervalSec = humInt;
-  bool txtChanged = dateStyle != txt.dateStyle || tempStyle != txt.tempStyle || humStyle != txt.humStyle || dateSpeed != txt.dateSpeed || tempSpeed != txt.tempSpeed || humSpeed != txt.humSpeed || holdMs != txt.holdMs || tempDec != (txt.tempDec != 0) || dateYear != (txt.dateYear != 0);
+  bool txtChanged = dateStyle != txt.dateStyle || tempStyle != txt.tempStyle || humStyle != txt.humStyle || dateSpeed != txt.dateSpeed || tempSpeed != txt.tempSpeed || humSpeed != txt.humSpeed || holdMs != txt.holdMs || tempDec != (txt.tempDec != 0) || dateYear != (txt.dateYear != 0) || dateSep != txt.dateSep;
   txt.dateStyle = dateStyle;
   txt.tempStyle = tempStyle;
   txt.humStyle = humStyle;
@@ -3040,6 +3096,7 @@ void handleApiConfig() {
   txt.holdMs = holdMs;
   txt.tempDec = tempDec ? 1 : 0;
   txt.dateYear = dateYear ? 1 : 0;
+  txt.dateSep = dateSep;  // [V4 CHANGE 4]
   useBootText = bootOn ? -1 : 0;
   bootText1 = boot1;
   bootText2 = boot2;
@@ -3077,6 +3134,7 @@ void handleApiConfig() {
   if (useresturl) startRestServer();  // Without this, enabling REST at runtime crashed the clock (server1 was never created)
   applyUpdateMode(update);
 
+  resetAutoShowTimers();  // [V3 CHANGE 2] new interval / switched on screens start counting from the moment of saving
   writeEEPROM();
   if (txtChanged) writeTxtConfig();
   configNTPTime();  // also sets the time zone
