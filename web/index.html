@@ -7,6 +7,15 @@
 <link rel="icon" href="data:,">
 <title>WordClock Einstellungen</title>
 <!--
+  [V6] ONE PAGE FOR ALL PANELS: System > Layout selects the standard or the big panel (letters of the preview, LED numbers of the words,
+  option VIERTEL / DREIVIERTEL only on the standard panel), the row mirroring and the current limit. Greetings moved to the tab "Lauftexte".
+  [V2] CHANGES compared to the original web/index.html:
+  1. NEW PANEL LAYOUT: letter rows of the preview (de), LED ranges of the hours (HOURS.de) and the minute words (VIERTEL, NACH, VOR, HALB)
+     moved to the new letter positions - the same LED numbers as in WordClockWithWeb.ino.
+  2. The option "VIERTEL / DREIVIERTEL" (quarterGroup) was removed, because the new panel has no DREIVIERTEL.
+  The row mirroring (LED_ROW_MIRROR) and the current limit (MAX_LED_CURRENT_MA) are only in the firmware, the preview is not affected.
+-->
+<!--
   WordClock web interface.
   This file is the source; the firmware serves a gzipped copy from WordClockWithWeb/webpage.h.
   The GitHub Action rebuilds webpage.h on every push. To try a change on your own clock first:
@@ -224,6 +233,33 @@ a{color:var(--accent)}
 .toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translate(-50%,12px);opacity:0;pointer-events:none;background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:600;font-size:14px;max-width:calc(100% - 32px);text-align:center;transition:opacity .2s,transform .2s;z-index:30}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* [V5] emojis + play */
+.etiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:10px}
+.etile{display:grid;gap:6px;justify-items:center;border:1px solid var(--line);border-radius:var(--r-s);padding:8px 6px;background:var(--surface)}
+.etile.on{border-color:var(--accent);background:var(--accent-soft)}
+.etile .ecv{border:0;background:none;padding:0;cursor:pointer;border-radius:6px;line-height:0}
+.etile .ecv:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.etile canvas{display:block;border-radius:6px}
+.etile.empty .ecv{opacity:.4;cursor:default}
+.etile .eplay{padding:3px 12px;font-size:12px}
+.edwrap,.playwrap{display:grid;gap:14px;justify-items:center}
+canvas.ledcv{max-width:100%;height:auto;touch-action:none;border-radius:10px;background:#0a0c0f;cursor:crosshair}
+canvas.playcv{cursor:pointer}
+.pal{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.pal button{width:30px;height:30px;border-radius:50%;border:2px solid var(--line);cursor:pointer;padding:0}
+.pal button[aria-pressed="true"]{outline:3px solid var(--accent);outline-offset:1px}
+.btnrow{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.playinfo{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;font-variant-numeric:tabular-nums}
+.playinfo output{font-weight:700}
+.pad{display:flex;align-items:center;justify-content:center;gap:26px;flex-wrap:wrap;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.dpad{display:grid;grid-template-columns:repeat(3,54px);grid-template-rows:repeat(3,54px);gap:6px}
+.pb{font:inherit;font-weight:700;font-size:20px;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:var(--r-s);cursor:pointer;touch-action:manipulation}
+.pb:active{background:var(--accent-soft);border-color:var(--accent)}
+.abtns{display:flex;gap:14px}
+.abtns .pb{width:62px;height:62px;border-radius:50%}
+.playhelp{text-align:center;max-width:46em}
+#playConn.bad{color:var(--bad);font-weight:600}
 </style>
 
 </head>
@@ -270,6 +306,8 @@ a{color:var(--accent)}
         <button type="button" role="tab" id="t-night" aria-controls="p-night" data-tab="night"><span data-t="tabNight">Nachtmodus</span></button>
         <button type="button" role="tab" id="t-disp" aria-controls="p-disp" data-tab="disp"><span data-t="tabDisp">Anzeige</span></button>
         <button type="button" role="tab" id="t-txt" aria-controls="p-txt" data-tab="txt"><span data-t="tabTxt">Lauftexte</span></button>
+        <button type="button" role="tab" id="t-emoji" aria-controls="p-emoji" data-tab="emoji"><span data-t="tabEmoji">Emojis</span></button>
+        <button type="button" role="tab" id="t-play" aria-controls="p-play" data-tab="play"><span data-t="tabPlay">Play</span></button>
         <button type="button" role="tab" id="t-time" aria-controls="p-time" data-tab="time"><span data-t="tabTime">Zeit</span></button>
         <button type="button" role="tab" id="t-net" aria-controls="p-net" data-tab="net"><span data-t="tabNet">Netzwerk</span></button>
         <button type="button" role="tab" id="t-sys" aria-controls="p-sys" data-tab="sys"><span data-t="tabSys">System</span></button>
@@ -464,9 +502,85 @@ a{color:var(--accent)}
             </div>
             <p class="hint" data-t="testHint"></p>
           </div>
+          <div class="group">
+            <h3 data-t="gGreet"></h3>
+            <div class="rows">
+              <label class="row" for="greetOn"><span class="rt"><b data-t="greetOn"></b><small data-t="greetSub"></small></span><input type="checkbox" class="sw" id="greetOn" data-k="fx.greet"></label>
+            </div>
+            <p class="hint" data-t="greetNote"></p>
+            <div class="btnrow">
+              <button type="button" class="btn sm" data-greet="1" data-t="testXmas"></button>
+              <button type="button" class="btn sm" data-greet="2" data-t="testNy"></button>
+            </div>
+          </div>
         </section>
 
         <!-- Time -->
+        <!-- Emojis [V5] -->
+        <section class="panel" id="p-emoji" role="tabpanel" aria-labelledby="t-emoji" hidden>
+          <div class="group">
+            <h3 data-t="gEmoji"></h3>
+            <div class="rows">
+              <label class="row" for="emojiOn"><span class="rt"><b data-t="emojiOn"></b><small data-t="emojiOnSub"></small></span><input type="checkbox" class="sw" id="emojiOn" data-k="fx.emoji"></label>
+              <div class="row"><span class="rt"><b data-t="interval"></b></span><span class="inline"><select class="ivsel" id="emojiInt" data-k="fx.emojiInt" data-type="num"><option value="30">30 s</option><option value="60">1 min</option><option value="120">2 min</option><option value="300">5 min</option><option value="600">10 min</option><option value="900">15 min</option><option value="1800">30 min</option><option value="3600">1 h</option><option value="7200">2 h</option></select></span></div>
+              <div class="row"><span class="rt"><b data-t="emojiMode"></b></span>
+                <div class="seg" role="radiogroup">
+                  <input type="radio" name="emojiMode" id="emMode0" value="0" data-k="fx.emojiMode"><label for="emMode0" data-t="emOrder"></label>
+                  <input type="radio" name="emojiMode" id="emMode1" value="1" data-k="fx.emojiMode"><label for="emMode1" data-t="emRandom"></label>
+                </div></div>
+            </div>
+          </div>
+          <div class="group">
+            <h3 data-t="gEmPick"></h3>
+            <p class="hint" data-t="emPickHint"></p>
+            <div class="etiles" id="emoTiles"></div>
+          </div>
+          <div class="group">
+            <h3 data-t="gEmEdit"></h3>
+            <p class="hint" data-t="edHint"></p>
+            <div class="edwrap">
+              <canvas id="edCv" class="ledcv"></canvas>
+              <div class="pal" id="edPal"></div>
+              <div class="inline"><span class="muted" data-t="edSlot"></span><div class="seg sm" id="edSlots" role="radiogroup"></div></div>
+              <div class="btnrow">
+                <button type="button" class="btn sm" id="edClear" data-t="edClear"></button>
+                <button type="button" class="btn sm" id="edLoad" data-t="edLoad"></button>
+                <button type="button" class="btn sm primary" id="edSave" data-t="edSave"></button>
+                <button type="button" class="btn sm" id="edEmpty" data-t="edEmpty"></button>
+                <button type="button" class="btn sm" id="edPreview" data-t="edPreview"></button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Play [V5] -->
+        <section class="panel" id="p-play" role="tabpanel" aria-labelledby="t-play" hidden>
+          <div class="group">
+            <h3 data-t="gPlayGame"></h3>
+            <div class="seg" role="radiogroup" id="gameSeg"></div>
+          </div>
+          <div class="group playwrap">
+            <p class="hint playhelp" id="gameHelp"></p>
+            <canvas id="playCv" class="ledcv playcv"></canvas>
+            <div class="playinfo"><span><span class="muted" data-t="score"></span> <output id="pScore">0</output></span><span><span class="muted" data-t="best"></span> <output id="pBest">0</output></span><span id="pState"></span></div>
+            <div class="pad" id="pad">
+              <div class="dpad">
+                <button type="button" class="pb" data-pk="up" style="grid-area:1/2" aria-label="▲">▲</button>
+                <button type="button" class="pb" data-pk="left" style="grid-area:2/1" aria-label="◀">◀</button>
+                <button type="button" class="pb" data-pk="right" style="grid-area:2/3" aria-label="▶">▶</button>
+                <button type="button" class="pb" data-pk="down" style="grid-area:3/2" aria-label="▼">▼</button>
+              </div>
+              <div class="abtns"><button type="button" class="pb" data-pk="b">B</button><button type="button" class="pb" data-pk="a">A</button></div>
+              <button type="button" class="btn primary" id="playStart" data-pk="start">Start</button>
+            </div>
+            <p class="hint playhelp" data-t="keysHint"></p>
+            <div class="rows" style="width:100%">
+              <label class="row" for="playOn"><span class="rt"><b data-t="playOn"></b><small data-t="playOnSub"></small></span><input type="checkbox" class="sw" id="playOn"></label>
+            </div>
+            <p class="hint" id="playConn"></p>
+          </div>
+        </section>
+
         <section class="panel" id="p-time" role="tabpanel" aria-labelledby="t-time" hidden>
           <div class="group">
             <h3 data-t="gSource">Zeitquelle</h3>
@@ -568,6 +682,20 @@ a{color:var(--accent)}
             <p class="hint" id="pinHint"></p>
           </div>
           <div class="group">
+            <h3 data-t="gLayout"></h3>
+            <div class="cards" role="radiogroup">
+              <label class="card" for="ly0"><input type="radio" name="layout" id="ly0" value="0" data-k="layout"><b data-t="layoutStd"></b><small data-t="layoutStdSub"></small></label>
+              <label class="card" for="ly1"><input type="radio" name="layout" id="ly1" value="1" data-k="layout"><b data-t="layoutBig"></b><small data-t="layoutBigSub"></small></label>
+            </div>
+            <div class="rows">
+              <label class="row" for="rowMirror"><span class="rt"><b data-t="rowMirror"></b><small data-t="rowMirrorSub"></small></span><input type="checkbox" class="sw" id="rowMirror" data-k="rowMirror"></label>
+            </div>
+            <div class="ipgrid">
+              <div class="field"><label for="maxMA" data-t="maxMA"></label><input type="number" id="maxMA" min="0" max="10000" step="100" data-k="maxMA" data-type="num"><small id="maxMAOut" class="muted"></small></div>
+            </div>
+            <p class="hint" data-t="layoutHint"></p>
+          </div>
+          <div class="group">
             <div class="actionrow">
               <span class="rt"><b data-t="gRestart">Neustart</b><small data-t="restartSub"></small></span>
               <button type="button" class="btn" data-ask="restart" data-t="restartBtn">Neu starten</button>
@@ -621,14 +749,17 @@ const mock = {
     ledTest: true, setWlan: true, showIp: true,
     ntp: "de.pool.ntp.org", tz: "CET-1CEST,M3.5.0/02,M10.5.0/03",
     hostNum: 0, ping: { on: false, ips: ["192.168.178.56","0.0.0.0","0.0.0.0"], tries: 10, debug: false },
-    rest: true, update: 1, pins: { led: 12, sda: 4, scl: 5 }
+    rest: true, update: 1, pins: { led: 12, sda: 4, scl: 5 },
+    fx: { emoji: true, emojiInt: 600, emojiMode: 0, mask: 4095, greet: true },
+    layout: 0, rowMirror: false, maxMA: 0
   },
   status: {
     version: "V6.1.0", chip: "ESP8266", ip: "192.168.178.50", mac: "A4:CF:12:3B:7E:01",
     ssid: "Heimnetz", rssi: -58, ntpOk: true, ntpAgoMin: 12, rtc: true, rtcOk: true, htu: true, timeOk: true,
     uptime: 3*86400 + 5*3600 + 12*60, heap: 36120, ledsOn: true, restPort: 55555, curColor: "#00ff00", rainbowSeed: 123456789,
     pinDefaults: { led: 12, sda: 4, scl: 5 }
-  }
+  },
+  custom: ["", "", "", ""]
 };
 
 async function call(url, opts) {
@@ -671,6 +802,56 @@ const api = {
 const T = {
   de: {
     tabTxt: "Lauftexte",
+    tabEmoji: "Emojis",
+    tabPlay: "Play",
+    gEmoji: "Emojis auf der Uhr",
+    emojiOn: "Emojis anzeigen",
+    emojiOnSub: "Im eingestellten Intervall erscheint ein kleines buntes Bild auf der Uhr.",
+    emojiMode: "Reihenfolge",
+    emOrder: "Der Reihe nach",
+    emRandom: "Zufällig",
+    gEmPick: "Auswahl",
+    emPickHint: "Bild antippen = an- oder abwählen. Mit ▶ zeigt die Uhr es sofort. Zum Übernehmen unten „Speichern“.",
+    gEmEdit: "Eigenes Emoji zeichnen",
+    edHint: "Farbe wählen und auf die Punkte tippen oder ziehen (rechte Maustaste = löschen). Das Bild wird auf einem der 4 Plätze gespeichert und erscheint dann oben in der Auswahl.",
+    edSlot: "Platz",
+    edClear: "Leeren",
+    edLoad: "Platz laden",
+    edSave: "In Platz speichern",
+    edEmpty: "Platz löschen",
+    edPreview: "Auf der Uhr ansehen",
+    edSaved: "Emoji gespeichert (Platz {n}). Zum Aktivieren unten „Speichern“.",
+    edDeleted: "Platz {n} gelöscht. Unten „Speichern“ übernimmt die Auswahl.",
+    edBlank: "Das Bild ist leer.",
+    gGreet: "Weihnachten & Neujahr",
+    greetOn: "Glückwünsche anzeigen",
+    greetSub: "Am 25.12. und am 01.01. läuft ab 00:00 alle 2 Minuten der Gruß über die Uhr: Deutsch, Spanisch, Englisch, dazwischen jeweils eine kurze Pause.",
+    greetNote: "Im Nachtmodus mit ausgeschaltetem Display erscheint der Gruß erst, wenn das Display wieder an ist.",
+    testXmas: "Weihnachten testen",
+    testNy: "Neujahr testen",
+    gPlayGame: "Spiel",
+    score: "Punkte",
+    best: "Rekord",
+    playStart: "Start",
+    playPause: "Pause",
+    playResume: "Weiter",
+    playAgain: "Nochmal",
+    stReady: "Bereit",
+    stRun: "Läuft",
+    stPause: "Pause",
+    stOver: "Game Over",
+    playOn: "Auch auf der Uhr spielen",
+    playOnSub: "Die Uhr zeigt das Spiel live. Kommt kein Bild mehr an, kehrt sie nach 4 Sekunden zur Uhrzeit zurück.",
+    connOk: "Die Uhr zeigt das Spiel.",
+    connErr: "Keine Verbindung zur Uhr.",
+    mockNote: "Demo-Modus: Du spielst nur im Browser.",
+    keysHint: "Tastatur: Pfeile oder WASD, Leertaste = A, X = B, Enter = Start/Pause. Am Handy die Tasten benutzen, bei der Spielfläche geht auch Wischen.",
+    gh_snake: "Lenken mit Pfeilen. Friss die roten Punkte und stoße nirgends an.",
+    gh_tetris: "◀ ▶ bewegen, ▲ oder A drehen, ▼ schneller, B (oder X) fallen lassen. Rechts siehst du das nächste Teil, die Ecken zeigen das Level.",
+    gh_breakout: "◀ ▶ bewegt den Schläger. Zerstöre alle Steine. Die Ecken zeigen die Leben.",
+    gh_pong: "▲ ▼ bewegt den Schläger links, der Computer spielt rechts. Die Ecken zeigen die Leben.",
+    gh_flappy: "A, ▲ oder Leertaste: flattern. Flieg durch die Lücken.",
+    gh_invaders: "◀ ▶ bewegen, A oder ▲ schießen. Die Ecken zeigen die Leben.",
     gTxtPrev: "Vorschau",
     pvDate: "Datum",
     pvTemp: "Temperatur",
@@ -770,6 +951,16 @@ const T = {
     uHint0: "Updates sind ausgeschaltet.", uHint1: "Lade eine .bin-Datei über die Update-Seite hoch:",
     uHint2Ok: "Installiert ist die aktuelle Version {v}.", uHint2New: "Version {v} ist verfügbar.", uInstall: "Jetzt installieren", uStarted: "Update auf {v} läuft. Die Uhr zeigt den Fortschritt an und startet danach neu.",
     uChecking: "Suche nach Updates auf GitHub …", uErr: "GitHub ist gerade nicht erreichbar.", uErrMem: "Zu wenig freier Speicher für die Verbindung zu GitHub. Nach einem Neustart erneut versuchen.", uRecheck: "Erneut prüfen", actionErr: "Die Uhr hat nicht geantwortet.",
+    gLayout: "Bauform der Uhr",
+    layoutStd: "Standard",
+    layoutStdSub: "Original-Buchstabenplatte (ESKISTAFÜNF …)",
+    layoutBig: "Groß",
+    layoutBigSub: "Große Uhr mit neuer Anordnung (ESMISTEFÜNF …)",
+    rowMirror: "Zeilen spiegeln",
+    rowMirrorSub: "Nur wenn der LED-Streifen andersherum verlötet ist (oberste Reihe beginnt links).",
+    maxMA: "Strombegrenzung (mA)",
+    off: "0 = aus",
+    layoutHint: "Die Wahl bestimmt, welche Buchstaben für die Uhrzeit leuchten. Bei falscher Wahl leuchten die falschen Wörter. Die Strombegrenzung sollte etwas unter der Leistung des Netzteils liegen (z. B. 3000 für 5 V / 4 A).",
     gHw: "Hardware", pinLed: "LED-Daten (GPIO)", pinSda: "RTC SDA (GPIO)", pinScl: "RTC SCL (GPIO)",
     pinHint: "GPIO-Nummern der Anschlüsse. Änderungen gelten nach einem Neustart. Standard beim {chip}: LED {l}, SDA {d}, SCL {c}.",
     pinErr: "Bitte drei verschiedene GPIO-Nummern von 0 bis 48 angeben.", savedRestart: "Gespeichert. Die neuen Pins gelten nach einem Neustart.",
@@ -784,6 +975,56 @@ const T = {
   },
   en: {
     tabTxt: "Floating texts",
+    tabEmoji: "Emojis",
+    tabPlay: "Play",
+    gEmoji: "Emojis on the clock",
+    emojiOn: "Show emojis",
+    emojiOnSub: "A small colourful picture appears on the clock at the set interval.",
+    emojiMode: "Order",
+    emOrder: "In order",
+    emRandom: "Random",
+    gEmPick: "Selection",
+    emPickHint: "Tap a picture to select or deselect it. ▶ shows it on the clock right away. Press “Save” below to apply.",
+    gEmEdit: "Draw your own emoji",
+    edHint: "Pick a colour and tap or drag over the dots (right mouse button = erase). The picture is stored in one of 4 slots and then appears in the selection above.",
+    edSlot: "Slot",
+    edClear: "Clear",
+    edLoad: "Load slot",
+    edSave: "Save to slot",
+    edEmpty: "Delete slot",
+    edPreview: "Preview on the clock",
+    edSaved: "Emoji saved (slot {n}). Press “Save” below to activate it.",
+    edDeleted: "Slot {n} deleted. “Save” below applies the selection.",
+    edBlank: "The picture is empty.",
+    gGreet: "Christmas & New Year",
+    greetOn: "Show greetings",
+    greetSub: "On 25 Dec and 1 Jan the greeting runs across the clock every 2 minutes from 00:00: German, Spanish, English, with a short pause between them.",
+    greetNote: "With night mode and the display switched off, the greeting only appears once the display is on again.",
+    testXmas: "Test Christmas",
+    testNy: "Test New Year",
+    gPlayGame: "Game",
+    score: "Score",
+    best: "Best",
+    playStart: "Start",
+    playPause: "Pause",
+    playResume: "Resume",
+    playAgain: "Again",
+    stReady: "Ready",
+    stRun: "Running",
+    stPause: "Paused",
+    stOver: "Game over",
+    playOn: "Play on the clock too",
+    playOnSub: "The clock shows the game live. If no picture arrives any more, it returns to the time after 4 seconds.",
+    connOk: "The clock shows the game.",
+    connErr: "No connection to the clock.",
+    mockNote: "Demo mode: you play in the browser only.",
+    keysHint: "Keyboard: arrows or WASD, Space = A, X = B, Enter = Start/Pause. On a phone use the buttons; swiping on the picture works too.",
+    gh_snake: "Steer with the arrows. Eat the red dots and don't hit anything.",
+    gh_tetris: "◀ ▶ move, ▲ or A rotate, ▼ faster, B (or X) drop. The next piece is on the right, the corners show the level.",
+    gh_breakout: "◀ ▶ moves the paddle. Destroy all bricks. The corners show the lives.",
+    gh_pong: "▲ ▼ moves the left paddle, the computer plays on the right. The corners show the lives.",
+    gh_flappy: "A, ▲ or Space: flap. Fly through the gaps.",
+    gh_invaders: "◀ ▶ move, A or ▲ shoot. The corners show the lives.",
     gTxtPrev: "Preview",
     pvDate: "Date",
     pvTemp: "Temperature",
@@ -883,6 +1124,16 @@ const T = {
     uHint0: "Updates are turned off.", uHint1: "Upload a .bin file on the update page:",
     uHint2Ok: "The latest version {v} is installed.", uHint2New: "Version {v} is available.", uInstall: "Install now", uStarted: "Updating to {v}. The clock shows the progress and restarts afterwards.",
     uChecking: "Checking GitHub for updates…", uErr: "GitHub is not reachable right now.", uErrMem: "Not enough free memory for the connection to GitHub. Try again after a restart.", uRecheck: "Check again", actionErr: "The clock did not respond.",
+    gLayout: "Clock type",
+    layoutStd: "Standard",
+    layoutStdSub: "Original letter plate (ESKISTAFÜNF …)",
+    layoutBig: "Big",
+    layoutBigSub: "Big clock with the new letter arrangement (ESMISTEFÜNF …)",
+    rowMirror: "Mirror rows",
+    rowMirrorSub: "Only if the LED strip was soldered the other way round (top row starts on the left).",
+    maxMA: "Current limit (mA)",
+    off: "0 = off",
+    layoutHint: "This decides which letters light up for the time. With the wrong choice the wrong words light up. The current limit should be a little below the rating of the power supply (e.g. 3000 for 5 V / 4 A).",
     gHw: "Hardware", pinLed: "LED data (GPIO)", pinSda: "RTC SDA (GPIO)", pinScl: "RTC SCL (GPIO)",
     pinHint: "GPIO numbers of the connections. Changes apply after a restart. Default for the {chip}: LED {l}, SDA {d}, SCL {c}.",
     pinErr: "Enter three different GPIO numbers from 0 to 48.", savedRestart: "Saved. The new pins apply after a restart.",
@@ -897,6 +1148,56 @@ const T = {
   },
   es: {
     tabTxt: "Textos flotantes",
+    tabEmoji: "Emojis",
+    tabPlay: "Play",
+    gEmoji: "Emojis en el reloj",
+    emojiOn: "Mostrar emojis",
+    emojiOnSub: "Cada cierto tiempo aparece un pequeño dibujo de colores en el reloj.",
+    emojiMode: "Orden",
+    emOrder: "En orden",
+    emRandom: "Aleatorio",
+    gEmPick: "Selección",
+    emPickHint: "Toca un dibujo para activarlo o desactivarlo. Con ▶ el reloj lo muestra al instante. Para aplicar, pulsa «Guardar» abajo.",
+    gEmEdit: "Dibuja tu propio emoji",
+    edHint: "Elige un color y toca o arrastra sobre los puntos (botón derecho = borrar). El dibujo se guarda en uno de los 4 espacios y aparece en la selección de arriba.",
+    edSlot: "Espacio",
+    edClear: "Vaciar",
+    edLoad: "Cargar espacio",
+    edSave: "Guardar en espacio",
+    edEmpty: "Borrar espacio",
+    edPreview: "Verlo en el reloj",
+    edSaved: "Emoji guardado (espacio {n}). Pulsa «Guardar» abajo para activarlo.",
+    edDeleted: "Espacio {n} borrado. «Guardar» abajo aplica la selección.",
+    edBlank: "El dibujo está vacío.",
+    gGreet: "Navidad y Año Nuevo",
+    greetOn: "Mostrar felicitaciones",
+    greetSub: "El 25/12 y el 01/01, desde las 00:00 y cada 2 minutos, el mensaje recorre el reloj en alemán, español e inglés, con una breve pausa entre idiomas.",
+    greetNote: "Con el modo nocturno y la pantalla apagada, el mensaje solo aparece cuando la pantalla vuelve a encenderse.",
+    testXmas: "Probar Navidad",
+    testNy: "Probar Año Nuevo",
+    gPlayGame: "Juego",
+    score: "Puntos",
+    best: "Récord",
+    playStart: "Inicio",
+    playPause: "Pausa",
+    playResume: "Seguir",
+    playAgain: "Otra vez",
+    stReady: "Listo",
+    stRun: "En juego",
+    stPause: "Pausa",
+    stOver: "Game over",
+    playOn: "Jugar también en el reloj",
+    playOnSub: "El reloj muestra el juego en directo. Si deja de llegar imagen, vuelve a la hora tras 4 segundos.",
+    connOk: "El reloj muestra el juego.",
+    connErr: "Sin conexión con el reloj.",
+    mockNote: "Modo demo: solo juegas en el navegador.",
+    keysHint: "Teclado: flechas o WASD, Espacio = A, X = B, Enter = Inicio/Pausa. En el móvil usa los botones; también puedes deslizar sobre la imagen.",
+    gh_snake: "Dirige con las flechas. Come los puntos rojos y no choques con nada.",
+    gh_tetris: "◀ ▶ mover, ▲ o A girar, ▼ más rápido, B (o X) dejar caer. A la derecha ves la siguiente pieza; las esquinas muestran el nivel.",
+    gh_breakout: "◀ ▶ mueve la pala. Destruye todos los ladrillos. Las esquinas muestran las vidas.",
+    gh_pong: "▲ ▼ mueve la pala izquierda; el ordenador juega a la derecha. Las esquinas muestran las vidas.",
+    gh_flappy: "A, ▲ o Espacio: aletear. Vuela por los huecos.",
+    gh_invaders: "◀ ▶ mover, A o ▲ disparar. Las esquinas muestran las vidas.",
     gTxtPrev: "Vista previa",
     pvDate: "Fecha",
     pvTemp: "Temperatura",
@@ -994,6 +1295,16 @@ const T = {
     uHint0: "Las actualizaciones están desactivadas.", uHint1: "Sube un archivo .bin en la página de actualización:",
     uHint2Ok: "Está instalada la última versión {v}.", uHint2New: "Hay disponible la versión {v}.", uInstall: "Instalar ahora", uStarted: "Actualizando a {v}. El reloj muestra el progreso y se reinicia después.",
     uChecking: "Buscando actualizaciones en GitHub…", uErr: "GitHub no está accesible en este momento.", uErrMem: "No hay memoria libre suficiente para la conexión con GitHub. Inténtalo de nuevo tras reiniciar.", uRecheck: "Comprobar de nuevo", actionErr: "El reloj no respondió.",
+    gLayout: "Tipo de reloj",
+    layoutStd: "Estándar",
+    layoutStdSub: "Placa de letras original (ESKISTAFÜNF …)",
+    layoutBig: "Grande",
+    layoutBigSub: "Reloj grande con la nueva distribución de letras (ESMISTEFÜNF …)",
+    rowMirror: "Espejar filas",
+    rowMirrorSub: "Solo si la tira de LED está soldada al revés (la fila superior empieza a la izquierda).",
+    maxMA: "Límite de corriente (mA)",
+    off: "0 = desactivado",
+    layoutHint: "Esto decide qué letras se iluminan para la hora. Con una elección equivocada se iluminan palabras equivocadas. El límite de corriente debe estar algo por debajo de la potencia de la fuente (p. ej. 3000 para 5 V / 4 A).",
     gHw: "Hardware", pinLed: "Datos de LED (GPIO)", pinSda: "RTC SDA (GPIO)", pinScl: "RTC SCL (GPIO)",
     pinHint: "Números GPIO de las conexiones. Los cambios se aplican tras reiniciar. Predeterminado para el {chip}: LED {l}, SDA {d}, SCL {c}.",
     pinErr: "Introduce tres números GPIO distintos del 0 al 48.", savedRestart: "Guardado. Los nuevos pines se aplican tras reiniciar.",
@@ -1028,22 +1339,35 @@ const SWATCHES = ["#00ff00", "#ffffff", "#ffb46b", "#ff8000", "#ff2a2a", "#2f6bf
 // Clock face: same LED numbering and word logic as showCurrentTime() in the firmware
 // ---------------------------------------------------------------------------------------------
 const ROWS = {
-  de: ["ESKISTAFÜNF","ZEHNZWANZIG","DREIVIERTEL","VORFUNKNACH","HALBAELFÜNF","EINSDCWZWEI","DREIAUJVIER","SECHSNLACHT","SIEBENZWÖLF","ZEHNEUNKUHR"],
+  de: ["ESMISTEFÜNF","ZEHNZWANZIG","NACHVIERTEL","VORNACHHALB","EINSINKZWEI","DREIEANVIER","FÜNFNISECHS","SIEBENIACHT","NEUNZEHNELF","ZWÖLFKABUHR"],  // big panel
+  deStd: ["ESKISTAFÜNF","ZEHNZWANZIG","DREIVIERTEL","VORFUNKNACH","HALBAELFÜNF","EINSDCWZWEI","DREIAUJVIER","SECHSNLACHT","SIEBENZWÖLF","ZEHNEUNKUHR"],  // standard panel
   en: ["ITLISASAMPM","ACQUARTERDC","TWENTYFIVEX","HALFSTENFTO","PASTERUNINE","ONESIXTHREE","FOURFIVETWO","EIGHTELEVEN","SEVENTWELVE","TENSEOCLOCK"]
 };
 const ledAt = (r, x) => r * 11 + (r % 2 === 0 ? 10 - x : x);
 const HOURS = {
-  de: { 1:[55,57], 2:[62,65], 3:[73,76], 4:[66,69], 5:[44,47], 6:[77,81], 7:[93,98], 8:[84,87], 9:[102,105], 10:[99,102], 11:[47,49], 12:[88,92] },
+  deStd: { 1:[55,57], 2:[62,65], 3:[73,76], 4:[66,69], 5:[44,47], 6:[77,81], 7:[93,98], 8:[84,87], 9:[102,105], 10:[99,102], 11:[47,49], 12:[88,92] },
+  de: { 1:[52,54], 2:[44,47], 3:[55,58], 4:[62,65], 5:[73,76], 6:[66,70], 7:[77,82], 8:[84,87], 9:[95,98], 10:[91,94], 11:[88,90], 12:[99,103] },
   en: { 1:[55,57], 2:[66,68], 3:[61,65], 4:[73,76], 5:[69,72], 6:[58,60], 7:[94,98], 8:[77,81], 9:[44,47], 10:[99,101], 11:[82,87], 12:[88,93] }
 };
 
-function lit(h, m, lang, deSp, order) {
+function lit(h, m, lang, deSp, order, big = true) {
   // word: LED -> number of its word, in the order the firmware sets the words (rainbow colors)
   const on = new Set(), hour = new Set(), word = new Map();
   let words = 0;
   const add = (a, b, s = on) => { if (s === on) words++; for (let i = Math.min(a, b); i <= Math.max(a, b); i++) { s.add(i); word.set(i, words - 1); } };
   const d = Math.floor(m / 5), is = (...v) => v.includes(d);
-  if (lang !== 1) {
+  if (lang !== 1 && big) {
+    add(9,10); add(5,7);
+    if (is(1,5,7,11)) add(0,3);
+    if (is(3,9)) add(22,28);  // VIERTEL (the big panel has no DREIVIERTEL: x:45 is always VIERTEL VOR)
+    if (is(2,10)) add(11,14);
+    if (is(4,8)) add(15,21);
+    if (is(7)) add(29,32);  // FÜNF NACH HALB: upper NACH
+    if (is(1,2,3,4)) add(36,39);
+    if (is(5,8,9,10,11)) add(33,35);
+    if (is(5,6,7)) add(40,43);
+    if (m < 5) add(107,109);
+  } else if (lang !== 1) {  // standard panel
     add(9,10); add(5,7);
     if (is(1,5,7,11)) add(0,3);
     if (deSp === 0) { if (is(3,9)) add(22,28); } else { if (is(3)) add(22,28); if (is(9)) add(22,32); }
@@ -1067,8 +1391,8 @@ function lit(h, m, lang, deSp, order) {
   }
   let xh = h % 12 || 12;
   if (m >= (lang !== 1 ? 25 : 35)) xh = xh === 12 ? 1 : xh + 1;
-  let [a, b] = HOURS[lang !== 1 ? "de" : "en"][xh];
-  if (lang !== 1 && xh === 1 && m > 4) b = 58;  // EINS
+  let [a, b] = HOURS[lang !== 1 ? (big ? "de" : "deStd") : "en"][xh];
+  if (lang !== 1 && xh === 1 && m > 4) { if (big) a = 51; else b = 58; }  // EINS
   add(a, b, hour); add(a, b);
   const mm = m % 5;
   for (let i = 0; i < 4; i++) if (mm > i) on.add(order[i]);
@@ -1091,7 +1415,7 @@ function parseOrder(s) {
 // ---------------------------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------------------------
-let cfg = null, saved = null, st = null, simMin = null, gridLang = -1, cornerTestLed = null;
+let cfg = null, saved = null, st = null, simMin = null, gridLang = -1, gridBig = -1, cornerTestLed = null;
 const cells = [];
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -1103,17 +1427,17 @@ const hostName = () => "WordClock" + cfg.hostNum;
 
 function buildGrid() {
   const g = $("#grid"); g.textContent = "";
-  const rows = ROWS[cfg.lang !== 1 ? "de" : "en"];
+  const rows = ROWS[cfg.lang !== 1 ? (cfg.layout === 1 ? "de" : "deStd") : "en"];
   for (let r = 0; r < 10; r++) for (let x = 0; x < 11; x++) {
     const s = document.createElement("span"); s.textContent = rows[r][x];
     cells[ledAt(r, x)] = s; g.appendChild(s);
   }
   $$(".corner").forEach(c => { cells[+c.dataset.led] = c; });
-  gridLang = cfg.lang;
+  gridLang = cfg.lang; gridBig = cfg.layout;
 }
 
 function phrase(on) {
-  const rows = ROWS[cfg.lang !== 1 ? "de" : "en"], words = [];
+  const rows = ROWS[cfg.lang !== 1 ? (cfg.layout === 1 ? "de" : "deStd") : "en"], words = [];
   for (let r = 0; r < 10; r++) { let w = ""; for (let x = 0; x < 11; x++) { if (on.has(ledAt(r, x))) w += rows[r][x]; else if (w) { words.push(w); w = ""; } } if (w) words.push(w); }
   return words.join(" ");
 }
@@ -1144,11 +1468,11 @@ function rbHues(seed, count) {
 
 function renderFace() {
   if (!cfg) return;
-  if (gridLang !== cfg.lang) buildGrid();
+  if (gridLang !== cfg.lang || gridBig !== cfg.layout) buildGrid();
   const now = new Date();
   const total = simMin ?? now.getHours() * 60 + now.getMinutes();
   const h = Math.floor(total / 60), m = total % 60;
-  const { on, hour, word } = lit(h, m, cfg.lang, cfg.deSpecial, minuteOrder(cfg));
+  const { on, hour, word } = lit(h, m, cfg.lang, cfg.deSpecial, minuteOrder(cfg), cfg.layout === 1);
   const [offFrom, onAfter] = cfg.nightDays[(now.getDay() + 6) % 7];
   const isNight = cfg.night !== 0 && !(h > onAfter && h < offFrom);
   const dark = !st.ledsOn || (isNight && cfg.night === 1);
@@ -1284,7 +1608,7 @@ function pvBuild() {
 }
 function pvGrid() {
   const g = $("#pgrid"); g.textContent = ""; pvCells.length = 0;
-  const rows = ROWS[cfg.lang !== 1 ? "de" : "en"];
+  const rows = ROWS[cfg.lang !== 1 ? (cfg.layout === 1 ? "de" : "deStd") : "en"];
   for (let r = 0; r < 10; r++) for (let x = 0; x < 11; x++) {
     const s = document.createElement("span"); s.textContent = rows[r][x]; pvCells.push(s); g.appendChild(s);
   }
@@ -1357,7 +1681,8 @@ function renderDeps() {
     if (bar) bar.style.background = `linear-gradient(90deg,var(--bar-off) 0 ${a}%,var(--bar-on) ${a}% ${b}%,var(--bar-off) ${b}% 100%)`;
   });
   // Display
-  $("#quarterGroup").hidden = cfg.lang === 1;
+  $("#quarterGroup").hidden = cfg.lang === 1 || cfg.layout === 1;  // [V6] DREIVIERTEL only exists on the standard panel
+  $("#maxMAOut").textContent = cfg.maxMA > 0 ? "" : t("off");
   const pd = st.pinDefaults || {};
   $("#pinHint").textContent = t("pinHint", { chip: st.chip, l: pd.led, d: pd.sda, c: pd.scl });
   $("#bootFields").hidden = !cfg.bootText;
@@ -1476,7 +1801,14 @@ function syncLang() {
   const nl = ["de", "en", "es"][cfg.lang] || "de";
   if (nl !== L) { L = nl; applyLang(); renderStatus(); }
 }
-function after() { syncLang(); renderDeps(); renderFace(); updateDirty(); maybeCheckUpdate(); if (!$("#p-txt").hidden) pvPlay(); }
+function after() { syncLang(); renderDeps(); renderFace(); updateDirty(); maybeCheckUpdate(); if (!$("#p-txt").hidden) pvPlay(); renderFxUI(); }
+
+// [V5] emoji tab: selection state of the tiles, texts of the Play tab
+function renderFxUI() {
+  if (!cfg || !cfg.fx) return;
+  renderEmojiTiles(); playInfo();
+  $("#emojiInt").disabled = !cfg.fx.emoji; $$("[name=emojiMode]").forEach(r => { r.disabled = !cfg.fx.emoji; });
+}
 
 // Reload only the device status (not the settings, which may have unsaved changes)
 async function refreshStatus() {
@@ -1506,9 +1838,9 @@ function updateDirty() {
   const ch = changedKeys();
   $("#savebar").hidden = ch.length === 0;
   $("#dirtyText").textContent = ch.length === 1 ? t("dirty1") : t("dirtyN", { n: ch.length });
-  const tabOf = { led: ["color","rainbow","bright","brightNight","psu"], night: ["night","nightDays"], disp: ["lang","deSpecial","blink","date","dateInt","temp","tempInt","hum","humInt","bootText","boot1","boot2","minMode","minOrder","ledTest","setWlan","showIp"], txt: ["txt"], time: ["ntp","tz"], net: ["hostNum","ping","rest"], sys: ["update","pins"] };
+  const tabOf = { led: ["color","rainbow","bright","brightNight","psu"], night: ["night","nightDays"], disp: ["lang","deSpecial","blink","date","dateInt","temp","tempInt","hum","humInt","bootText","boot1","boot2","minMode","minOrder","ledTest","setWlan","showIp"], txt: ["txt","fx.greet"], time: ["ntp","tz"], net: ["hostNum","ping","rest"], sys: ["update","pins","layout","rowMirror","maxMA"], emoji: ["fx.emoji","fx.emojiInt","fx.emojiMode","fx.mask"], play: [] };
   $$("#tabs button").forEach(b => {
-    const has = ch.some(k => tabOf[b.dataset.tab].includes(k.split(".")[0]));
+    const has = ch.some(k => tabOf[b.dataset.tab].includes(k) || tabOf[b.dataset.tab].includes(k.split(".")[0]));
     let d = b.querySelector(".tdot");
     if (has && !d) { d = document.createElement("span"); d.className = "tdot"; d.setAttribute("aria-hidden", "true"); b.appendChild(d); }
     if (!has && d) d.remove();
@@ -1567,6 +1899,8 @@ function selectTab(id) {
   try { localStorage.setItem("wc-tab", id); } catch (e) {}
   maybeCheckUpdate();
   if (id === "txt") pvPlay(); else pvStop();
+  if (id === "play") playEnter(); else playLeave();  // [V5]
+  if (id === "emoji") renderEmojiTiles();
 }
 
 let toastTimer;
@@ -1672,20 +2006,501 @@ function wire() {
   $("#save").addEventListener("click", save);
 }
 
+// ---------------------------------------------------------------------------------------------
+// [V5] Emojis (tab "Emojis") and games (tab "Play")
+// A picture for the clock is 114 bytes, one per LED: 110 matrix LEDs row by row from the top left, then the corner LEDs 110..113.
+// Each byte is a RGB332 colour (RRRGGGBB), 0 = off. The same bytes are drawn in the browser, so the page shows what the clock shows.
+// ---------------------------------------------------------------------------------------------
+const EMO = {"order": ["heart", "smiley", "star", "ghost", "sun", "cat", "invader", "pacman", "mushroom", "flame", "tree", "coffee"], "frames": {"heart": [".............RRR.RRR...RWRRRRRRR..RRRRRRRRR..RRRRRRRRR...RRRRRRR.....RRRRR.......RRR.........R................", ".........................RR.RR.....RRRRRRR....RRRRRRR.....RRRRR.......RRR.........R..........................."], "smiley": ["...YYYYY.....YYYYYYY...YYYYYYYYY..YY.YYY.YY..YY.YYY.YY..YYYYYYYYY..Y.YYYYY.Y..YY.....YY...YYYYYYY.....YYYYY...", "...YYYYY.....YYYYYYY...YYYYYYYYY..YYYYYY.YY..YY.YYY.YY..YYYYYYYYY..Y.YYYYY.Y..YY.....YY...YYYYYYY.....YYYYY..."], "star": [".....Y..........Y.........YYY....YYYYYYYYYYY.YYYYYYYYY...YYYYYYY....YYYYYYY...YYYY.YYYY..YYY...YYY..YY.....YY."], "ghost": ["...WWWWW.....WWWWWWW...WWWWWWWWW..WWBWWWBWW..WWBWWWBWW..WWWWWWWWW..WWWWWWWWW..WWWWWWWWW..WWWWWWWWW..WW.WWW.WW."], "sun": [".....O......O...O...O...O.YYY.O.....YYYYY...OO.YYYYY.OO...YYYYY.....O.YYY.O...O...O...O......O................"], "cat": [".O.......O..OO.....OO..OOOOOOOOO..OOOOOOOOO..OOGOOOGOO.WOOOOOOOOOW.OOOOPOOOO...OOOOOOO.....OOOOO.............."], "invader": [".............G.....G.....G...G.....GGGGGGG...GG.GGG.GG.GGGGGGGGGGGG.GGGGGGG.GG.G.....G.G...GG.GG..............", ".............G.....G..G..G...G..GG.GGGGGGG.GGGG.GGG.GGGGGGGGGGGGGG.GGGGGGGGG...G.....G...G.......G............"], "pacman": ["..YYYY......YYYYYY....YYYY.YY....YYYYYY.....YYYY....W.WYYYY....W.WYYYYYY.....YYYYYYY.....YYYYYY......YYYY.....", "..YYYYY.....YYYYYYY...YYYY.YYYY..YYYYYYYYY..YYYYYYYYY.WYYYYYYYYY.WYYYYYYYYY..YYYYYYYYY...YYYYYYY.....YYYYY...."], "mushroom": ["...RRRRR.....RRRRRRR...RWWRRRWWR.RRWWRRRWWRRRRRRWWWRRRRRRRRRRRRRRR...SSSSS......S.S.S......SSSSS.......SSS...."], "flame": [".....R.........RR.........RRR.......RRORR.....RRRORRR....RROOORR...RRROOOORR..RROOYOOOR..RROOYYOOR...RROYYOR.."], "tree": [".....Y..........G.........GGG.......GGRGG.......GGG.......GGGGG.....GGGGBGG...GGGGGGGGG......N.........NNN...."], "coffee": ["...W...W.......W...W.....W...W...............WWWWWWWW...WNNNNNNWW..WNNNNNNW.W.WNNNNNNWW...WWWWWWW............."]}, "pal": {"R": [255, 0, 0], "W": [255, 255, 255], "Y": [255, 190, 0], "B": [0, 70, 255], "O": [255, 90, 0], "G": [0, 200, 0], "P": [255, 70, 130], "N": [130, 60, 10], "S": [255, 190, 140]}};
+const W = 11, H = 10;
+const rgb332css = v => `rgb(${Math.round(((v >> 5) & 7) * 255 / 7)},${Math.round(((v >> 2) & 7) * 255 / 7)},${(v & 3) * 85})`;
+const C332 = Array.from({ length: 256 }, (_, v) => rgb332css(v));
+const toHex = a => Array.from(a, b => b.toString(16).padStart(2, "0")).join("");
+const fromHex = s => Uint8Array.from(s.match(/../g) || [], h => parseInt(h, 16));
+const COL = { K: 0x00, RED: 0xE0, ORG: 0xF0, YEL: 0xFC, GRN: 0x1C, DGRN: 0x0C, CYN: 0x1F, BLU: 0x03, LBLU: 0x4F, PUR: 0x63, MAG: 0xE3, PNK: 0xE9, WHT: 0xFF, GRY: 0x92, DGRY: 0x49, BRN: 0x88, SKIN: 0xF5 };
+const PALETTE = [COL.K, COL.RED, COL.ORG, COL.YEL, COL.GRN, COL.DGRN, COL.CYN, COL.BLU, COL.LBLU, COL.PUR, COL.MAG, COL.PNK, COL.WHT, COL.GRY, COL.BRN, COL.SKIN];
+
+// Draws an 11 x 10 LED grid. getc(x, y) returns a css colour or null; corners (optional) returns the colour of LED 110..113.
+function drawLeds(cv, getc, cell, corners) {
+  const m = corners ? Math.round(cell * 0.85) : 0;
+  const w = W * cell + 2 * m, h = H * cell + 2 * m, dpr = Math.min(2, window.devicePixelRatio || 1);
+  if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.width = w + "px"; cv.style.height = h + "px"; }
+  const g = cv.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.shadowBlur = 0; g.fillStyle = "#0a0c0f"; g.fillRect(0, 0, w, h);
+  const led = (cx, cy, r, c) => {
+    g.beginPath(); g.arc(cx, cy, r, 0, 7);
+    if (c) { g.shadowColor = c; g.shadowBlur = cell * 0.45; g.fillStyle = c; } else { g.shadowBlur = 0; g.fillStyle = "#1d2229"; }
+    g.fill();
+  };
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) led(m + x * cell + cell / 2, m + y * cell + cell / 2, cell * 0.38, getc(x, y));
+  if (corners) {
+    const r = cell * 0.2, o = m / 2;
+    led(o, o, r, corners(112)); led(w - o, o, r, corners(113)); led(w - o, h - o, r, corners(110)); led(o, h - o, r, corners(111));
+  }
+  g.shadowBlur = 0;
+}
+
+// ----- Emojis tab -----------------------------------------------------------------------------
+let customEmo = ["", "", "", ""];                 // hex strings of the 4 custom emojis ("" = empty)
+const edit = { slot: 0, color: COL.RED, px: new Uint8Array(110), down: false, busy: false };
+let emoFrame = 0;
+
+const emoCss = (id, frame, x, y) => {
+  if (id < 12) {
+    const fr = EMO.frames[EMO.order[id]], s = fr[Math.min(frame, fr.length - 1)], ch = s[y * W + x];
+    const p = EMO.pal[ch]; return p ? `rgb(${p[0]},${p[1]},${p[2]})` : null;
+  }
+  const hx = customEmo[id - 12]; if (!hx) return null;
+  const v = parseInt(hx.substr((y * W + x) * 2, 2), 16); return v ? C332[v] : null;
+};
+
+function buildEmojiTiles() {
+  const box = $("#emoTiles");
+  if (!box.children.length) {
+    box.innerHTML = Array.from({ length: 16 }, (_, i) =>
+      `<div class="etile" data-i="${i}"><button type="button" class="ecv" data-etoggle="${i}"><canvas></canvas></button><button type="button" class="btn sm eplay" data-eshow="${i}" aria-label="▶">▶</button></div>`).join("");
+  }
+  renderEmojiTiles();
+}
+
+function renderEmojiTiles() {
+  const mask = cfg && cfg.fx ? cfg.fx.mask : 0xFFF;
+  $$("#emoTiles .etile").forEach(el => {
+    const i = +el.dataset.i, used = i < 12 || !!customEmo[i - 12];
+    el.classList.toggle("on", used && !!(mask & (1 << i)));
+    el.classList.toggle("empty", !used);
+    el.querySelector(".eplay").disabled = !used;
+    el.querySelector(".ecv").setAttribute("aria-pressed", String(used && !!(mask & (1 << i))));
+    drawLeds(el.querySelector("canvas"), (x, y) => emoCss(i, emoFrame, x, y), 5);
+  });
+}
+
+function buildEditor() {
+  $("#edPal").innerHTML = PALETTE.map(c => `<button type="button" data-ec="${c}" style="background:${c ? C332[c] : "#1d2229"}" aria-label="${c ? C332[c] : "off"}"></button>`).join("");
+  $("#edSlots").innerHTML = [0, 1, 2, 3].map(i => `<input type="radio" name="edSlot" id="edS${i}" value="${i}"${i === 0 ? " checked" : ""}><label for="edS${i}">${i + 1}</label>`).join("");
+  renderEditor();
+}
+
+function renderEditor() {
+  $$("#edPal button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.ec === edit.color)));
+  drawLeds($("#edCv"), (x, y) => { const v = edit.px[y * W + x]; return v ? C332[v] : null; }, 26);
+}
+
+function editPaint(e) {
+  const cv = $("#edCv"), r = cv.getBoundingClientRect();
+  const x = Math.floor((e.clientX - r.left) / r.width * W), y = Math.floor((e.clientY - r.top) / r.height * H);
+  if (x < 0 || x >= W || y < 0 || y >= H) return;
+  const v = e.buttons === 2 ? 0 : edit.color;
+  if (edit.px[y * W + x] !== v) { edit.px[y * W + x] = v; renderEditor(); }
+}
+
+async function playPost(body) {
+  const r = await fetch("/api/play", { method: "POST", headers: { "Content-Type": "text/plain" }, body });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+}
+
+async function editPreview() {
+  if (MOCK) { toast(t("mockNote")); return; }
+  if (edit.busy) return; edit.busy = true;
+  try {
+    const f = new Uint8Array(114); f.set(edit.px); const hx = toHex(f);
+    for (let i = 0; i < 4; i++) { await playPost(hx); await sleep(1000); }
+    await playPost("stop");
+  } catch (err) { toast(t("actionErr")); }
+  edit.busy = false;
+}
+
+async function editSave(empty) {
+  const hx = empty ? "" : toHex(edit.px);
+  if (!empty && !edit.px.some(v => v)) { toast(t("edBlank")); return; }
+  try { await api.action("emoji", { slot: edit.slot, data: hx }); } catch (err) { toast(t("actionErr")); return; }
+  customEmo[edit.slot] = hx;
+  if (empty) { cfg.fx.mask &= ~(1 << (12 + edit.slot)); toast(t("edDeleted", { n: edit.slot + 1 })); }
+  else { cfg.fx.mask |= 1 << (12 + edit.slot); toast(t("edSaved", { n: edit.slot + 1 })); }
+  renderEmojiTiles(); after();
+}
+
+function wireEmoji() {
+  buildEmojiTiles(); buildEditor();
+  $("#emoTiles").addEventListener("click", async e => {
+    const tg = e.target.closest("[data-etoggle]"), sh = e.target.closest("[data-eshow]");
+    if (tg) {
+      const i = +tg.dataset.etoggle; if (i >= 12 && !customEmo[i - 12]) return;
+      cfg.fx.mask ^= 1 << i; renderEmojiTiles(); after();
+    } else if (sh) {
+      try { await api.action("shownow", { what: "emoji", id: +sh.dataset.eshow }); } catch (err) { toast(t("actionErr")); }
+    }
+  });
+  $("#edPal").addEventListener("click", e => { const b = e.target.closest("button"); if (b) { edit.color = +b.dataset.ec; renderEditor(); } });
+  $("#edSlots").addEventListener("change", e => { edit.slot = +e.target.value; });
+  const cv = $("#edCv");
+  cv.addEventListener("contextmenu", e => e.preventDefault());
+  cv.addEventListener("pointerdown", e => { edit.down = true; cv.setPointerCapture(e.pointerId); editPaint(e); });
+  cv.addEventListener("pointermove", e => { if (edit.down) editPaint(e); });
+  ["pointerup", "pointercancel"].forEach(n => cv.addEventListener(n, () => { edit.down = false; }));
+  $("#edClear").addEventListener("click", () => { edit.px.fill(0); renderEditor(); });
+  $("#edLoad").addEventListener("click", () => { const h = customEmo[edit.slot]; edit.px.fill(0); if (h) edit.px.set(fromHex(h)); renderEditor(); });
+  $("#edSave").addEventListener("click", () => editSave(false));
+  $("#edEmpty").addEventListener("click", () => editSave(true));
+  $("#edPreview").addEventListener("click", editPreview);
+  $$("[data-greet]").forEach(b => b.addEventListener("click", async () => {
+    try { await api.action("shownow", { what: "greet", kind: +b.dataset.greet }); } catch (err) { toast(t("actionErr")); }
+  }));
+  setInterval(() => { if (!$("#p-emoji").hidden) { emoFrame ^= 1; renderEmojiTiles(); } }, 600);
+}
+
+// ----- Games ------------------------------------------------------------------------------------
+const F = new Uint8Array(114);
+const cl = () => F.fill(0);
+const px = (x, y, c) => { if (x >= 0 && x < W && y >= 0 && y < H) F[y * W + x] = c; };
+const CORNERS = [112, 113, 110, 111];  // lit in this order: top left, top right, bottom right, bottom left
+const setCorners = (n, c = COL.RED) => { for (let i = 0; i < 4; i++) F[CORNERS[i]] = i < n ? c : 0; };
+const rnd = n => Math.floor(Math.random() * n);
+const DIG = ["111101101101111", "010110010010111", "111001111100111", "111001111001111", "101101111001001", "111100111001111", "111100111101111", "111001001001001", "111101111101111", "111101111001111"];
+function drawNumber(n, c) {
+  const s = String(Math.min(999, Math.max(0, n))); let x0 = Math.floor((W - (s.length * 4 - 1)) / 2);
+  for (const ch of s) { const g = DIG[+ch]; for (let i = 0; i < 15; i++) if (g[i] === "1") px(x0 + (i % 3), 2 + Math.floor(i / 3), c); x0 += 4; }
+}
+
+const Snake = {
+  reset() { this.body = [{ x: 5, y: 5 }, { x: 4, y: 5 }, { x: 3, y: 5 }]; this.dir = { x: 1, y: 0 }; this.q = []; this.score = 0; this.over = false; this.place(); },
+  interval() { return Math.max(90, 210 - this.score * 5); },
+  place() { const free = []; for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (!this.body.some(s => s.x === x && s.y === y)) free.push({ x, y }); this.food = free.length ? free[rnd(free.length)] : null; },
+  key(k) {
+    const d = { left: { x: -1, y: 0 }, right: { x: 1, y: 0 }, up: { x: 0, y: -1 }, down: { x: 0, y: 1 } }[k]; if (!d) return;
+    const last = this.q.length ? this.q[this.q.length - 1] : this.dir;
+    if ((d.x === -last.x && d.y === -last.y) || (d.x === last.x && d.y === last.y)) return;
+    if (this.q.length < 2) this.q.push(d);
+  },
+  step() {
+    if (this.q.length) this.dir = this.q.shift();
+    const h = this.body[0], n = { x: h.x + this.dir.x, y: h.y + this.dir.y };
+    const eat = !!this.food && n.x === this.food.x && n.y === this.food.y;
+    const body = this.body.slice(0, this.body.length - (eat ? 0 : 1));
+    if (n.x < 0 || n.x >= W || n.y < 0 || n.y >= H || body.some(s => s.x === n.x && s.y === n.y)) { this.over = true; return; }
+    this.body.unshift(n);
+    if (eat) { this.score++; this.place(); if (!this.food) this.over = true; } else this.body.pop();
+  },
+  draw() { cl(); this.body.forEach((s, i) => px(s.x, s.y, i ? COL.DGRN : COL.GRN)); if (this.food) px(this.food.x, this.food.y, COL.RED); }
+};
+
+const TSHAPES = {
+  I: { n: 4, c: [[0, 1], [1, 1], [2, 1], [3, 1]], col: COL.CYN }, O: { n: 2, c: [[0, 0], [1, 0], [0, 1], [1, 1]], col: COL.YEL },
+  T: { n: 3, c: [[1, 0], [0, 1], [1, 1], [2, 1]], col: COL.MAG }, S: { n: 3, c: [[1, 0], [2, 0], [0, 1], [1, 1]], col: COL.GRN },
+  Z: { n: 3, c: [[0, 0], [1, 0], [1, 1], [2, 1]], col: COL.RED }, J: { n: 3, c: [[0, 0], [0, 1], [1, 1], [2, 1]], col: COL.LBLU },
+  L: { n: 3, c: [[2, 0], [0, 1], [1, 1], [2, 1]], col: COL.ORG }
+};
+const Tetris = {
+  BW: 8,
+  reset() { this.b = Array.from({ length: H }, () => Array(this.BW).fill(0)); this.score = 0; this.lines = 0; this.over = false; this.next = this.bag(); this.spawn(); },
+  bag() { const k = Object.keys(TSHAPES); return k[rnd(k.length)]; },
+  level() { return 1 + Math.floor(this.lines / 5); },
+  interval() { return Math.max(110, 650 - (this.level() - 1) * 70); },
+  spawn() {
+    this.type = this.next; this.next = this.bag(); const s = TSHAPES[this.type];
+    this.cells = s.c.map(c => c.slice()); const minY = Math.min(...this.cells.map(c => c[1]));
+    this.x = Math.floor((this.BW - s.n) / 2); this.y = -minY;
+    if (this.hit(this.cells, this.x, this.y)) this.over = true;
+  },
+  hit(cells, x, y) { return cells.some(([cx, cy]) => { const bx = x + cx, by = y + cy; return bx < 0 || bx >= this.BW || by >= H || (by >= 0 && this.b[by][bx]); }); },
+  rotated() { const n = TSHAPES[this.type].n; return this.type === "O" ? this.cells : this.cells.map(([x, y]) => [n - 1 - y, x]); },
+  key(k) {
+    if (k === "left" && !this.hit(this.cells, this.x - 1, this.y)) this.x--;
+    else if (k === "right" && !this.hit(this.cells, this.x + 1, this.y)) this.x++;
+    else if (k === "down") this.drop1();
+    else if (k === "up" || k === "a") { const r = this.rotated(); for (const dx of [0, -1, 1, -2, 2]) if (!this.hit(r, this.x + dx, this.y)) { this.cells = r; this.x += dx; break; } }
+    else if (k === "b") { while (!this.hit(this.cells, this.x, this.y + 1)) this.y++; this.lock(); }
+  },
+  drop1() { if (!this.hit(this.cells, this.x, this.y + 1)) this.y++; else this.lock(); },
+  step() { this.drop1(); },
+  lock() {
+    const col = TSHAPES[this.type].col;
+    this.cells.forEach(([cx, cy]) => { const by = this.y + cy; if (by >= 0) this.b[by][this.x + cx] = col; });
+    let n = 0;
+    for (let y = H - 1; y >= 0; y--) if (this.b[y].every(v => v)) { this.b.splice(y, 1); this.b.unshift(Array(this.BW).fill(0)); n++; y++; }
+    this.lines += n; this.score += [0, 1, 3, 5, 8][n];
+    this.spawn();
+  },
+  draw() {
+    cl();
+    for (let y = 0; y < H; y++) { for (let x = 0; x < this.BW; x++) px(x, y, this.b[y][x]); px(this.BW, y, COL.DGRY); }
+    const col = TSHAPES[this.type].col; this.cells.forEach(([cx, cy]) => px(this.x + cx, this.y + cy, col));
+    const s = TSHAPES[this.next], n = s.n; let r = s.c; if (this.next !== "O") r = r.map(([x, y]) => [n - 1 - y, x]);
+    const mx = Math.min(...r.map(c => c[0])), my = Math.min(...r.map(c => c[1]));
+    r.forEach(([x, y]) => px(this.BW + 1 + x - mx, 1 + y - my, s.col));
+    setCorners(Math.min(4, this.level()), COL.CYN);
+  }
+};
+
+const Breakout = {
+  reset() { this.score = 0; this.lives = 3; this.level = 0; this.pad = 4; this.over = false; this.mk(); this.serve(); },
+  mk() { this.bricks = [COL.RED, COL.ORG, COL.YEL].map(c => Array(W).fill(c)); },
+  serve() { this.bx = this.pad + 1; this.by = 8; this.dx = rnd(2) ? 1 : -1; this.dy = -1; this.wait = 6; },
+  interval() { return Math.max(65, 150 - this.level * 12 - Math.floor(this.score / 10) * 3); },
+  key(k) { if (k === "left") this.pad = Math.max(0, this.pad - 1); else if (k === "right") this.pad = Math.min(W - 3, this.pad + 1); },
+  step() {
+    if (this.wait > 0) { this.wait--; return; }
+    let nx = this.bx + this.dx, ny = this.by + this.dy;
+    if (nx < 0 || nx >= W) { this.dx = -this.dx; nx = this.bx + this.dx; }
+    if (ny < 0) { this.dy = -this.dy; ny = this.by + this.dy; }
+    if (ny >= 0 && ny < 3 && this.bricks[ny][nx]) {  // brick: remove it and bounce back
+      this.bricks[ny][nx] = 0; this.score++; this.dy = -this.dy;
+      if (this.bricks.every(r => r.every(v => !v))) { this.level++; this.mk(); this.serve(); }
+      return;
+    }
+    if (ny >= 9) {
+      if (this.dy > 0 && nx >= this.pad && nx <= this.pad + 2) {  // paddle
+        this.dy = -1; this.dx = nx === this.pad ? -1 : nx === this.pad + 2 ? 1 : (this.dx || (rnd(2) ? 1 : -1));
+        nx = this.bx + this.dx; ny = this.by + this.dy;
+        if (nx < 0 || nx >= W) { this.dx = -this.dx; nx = this.bx + this.dx; }
+      } else { this.lives--; if (this.lives <= 0) this.over = true; else this.serve(); return; }
+    }
+    this.bx = nx; this.by = ny;
+  },
+  draw() {
+    cl(); this.bricks.forEach((r, y) => r.forEach((c, x) => px(x, y, c)));
+    for (let i = 0; i < 3; i++) px(this.pad + i, 9, COL.CYN);
+    px(this.bx, this.by, COL.WHT); setCorners(this.lives, COL.RED);
+  }
+};
+
+const Pong = {
+  reset() { this.score = 0; this.lives = 3; this.py = 4; this.cy = 4; this.over = false; this.serve(1); },
+  serve(dir) { this.bx = 5; this.by = 1 + rnd(8); this.dx = dir; this.dy = [-1, 0, 1][rnd(3)]; this.wait = 5; },
+  interval() { return Math.max(70, 130 - this.score * 4); },
+  key(k) { if (k === "up") this.py = Math.max(0, this.py - 1); else if (k === "down") this.py = Math.min(H - 3, this.py + 1); },
+  bounceY(pad, ny) { return ny === pad ? -1 : ny === pad + 2 ? 1 : this.dy; },
+  step() {
+    if (this.wait > 0) { this.wait--; return; }
+    const chance = Math.min(0.92, 0.55 + this.score * 0.04);
+    if (Math.random() < chance) { const tgt = this.by - 1; if (this.cy < tgt) this.cy++; else if (this.cy > tgt) this.cy--; }
+    this.cy = Math.max(0, Math.min(H - 3, this.cy));
+    let nx = this.bx + this.dx, ny = this.by + this.dy;
+    if (ny < 0 || ny > 9) { this.dy = -this.dy; ny = this.by + this.dy; }
+    if (nx <= 0) {
+      if (ny >= this.py && ny <= this.py + 2) { this.dx = 1; this.dy = this.bounceY(this.py, ny); }
+      else { this.lives--; if (this.lives <= 0) this.over = true; else this.serve(1); return; }
+    } else if (nx >= 10) {
+      if (ny >= this.cy && ny <= this.cy + 2) { this.dx = -1; this.dy = this.bounceY(this.cy, ny); }
+      else { this.score++; this.serve(-1); return; }
+    } else { this.bx = nx; this.by = ny; return; }
+    this.bx = this.bx + this.dx; this.by = Math.max(0, Math.min(9, this.by + this.dy));
+  },
+  draw() {
+    cl(); for (let i = 0; i < 3; i++) { px(0, this.py + i, COL.CYN); px(10, this.cy + i, COL.RED); }
+    px(this.bx, this.by, COL.WHT); setCorners(this.lives, COL.RED);
+  }
+};
+
+const Flappy = {
+  reset() { this.y = 4; this.vy = 0; this.score = 0; this.over = false; this.pipes = [{ x: 11, g: 2 + rnd(5), done: false }, { x: 16, g: 2 + rnd(5), done: false }]; },
+  interval() { return Math.max(120, 210 - this.score * 3); },
+  key(k) { if (k === "a" || k === "up") this.vy = -1.5; },
+  step() {
+    this.vy = Math.min(this.vy + 0.45, 1.3); this.y += this.vy;
+    if (this.y < 0) { this.y = 0; this.vy = 0; }
+    this.pipes.forEach(p => { p.x--; });
+    if (this.pipes[0].x < -1) this.pipes.shift();
+    const last = this.pipes[this.pipes.length - 1]; if (last.x <= 6) this.pipes.push({ x: last.x + 5, g: 1 + rnd(6), done: false });
+    const r = Math.round(this.y);
+    if (r > 9) { this.over = true; return; }
+    for (const p of this.pipes) {
+      if (p.x === 2 && (r < p.g || r > p.g + 2)) { this.over = true; return; }
+      if (p.x < 2 && !p.done) { p.done = true; this.score++; }
+    }
+  },
+  draw() {
+    cl(); this.pipes.forEach(p => { for (let y = 0; y < H; y++) if (y < p.g || y > p.g + 2) px(p.x, y, COL.GRN); });
+    px(2, Math.max(0, Math.min(9, Math.round(this.y))), COL.YEL);
+  }
+};
+
+const Invaders = {
+  reset() { this.score = 0; this.lives = 3; this.wave = 0; this.sx = 5; this.pb = null; this.bombs = []; this.t = 0; this.over = false; this.hitFlash = 0; this.newWave(); },
+  newWave() { this.inv = []; for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) this.inv.push({ x: c * 2, y: r, r }); this.ox = 0; this.oy = 0; this.dir = 1; this.pb = null; this.bombs = []; },
+  interval() { return 60; },
+  key(k) { if (k === "left") this.sx = Math.max(0, this.sx - 1); else if (k === "right") this.sx = Math.min(W - 1, this.sx + 1); else if ((k === "a" || k === "up") && !this.pb) this.pb = { x: this.sx, y: 8 }; },
+  at(x, y) { return this.inv.findIndex(i => i.x + this.ox === x && i.y + this.oy === y); },
+  step() {
+    this.t++; if (this.hitFlash > 0) this.hitFlash--;
+    if (this.pb) {  // player bullet: one row per step
+      let i = this.at(this.pb.x, this.pb.y); if (i < 0) { this.pb.y--; i = this.at(this.pb.x, this.pb.y); }
+      if (i >= 0) { this.inv.splice(i, 1); this.score += 1; this.pb = null; } else if (this.pb.y < 0) this.pb = null;
+    }
+    const every = Math.max(3, this.inv.length + 3 - this.wave * 2);  // invaders: the fewer, the faster
+    if (this.t % every === 0 && this.inv.length) {
+      const maxX = Math.max(...this.inv.map(i => i.x)) + this.ox;
+      if ((this.dir > 0 && maxX >= W - 1) || (this.dir < 0 && this.ox <= 0)) { this.dir = -this.dir; this.oy++; } else this.ox += this.dir;
+    }
+    if (this.inv.some(i => i.y + this.oy >= 8)) { this.over = true; return; }
+    if (this.t % 3 === 0) this.bombs.forEach(b => { b.y++; });  // bombs: one row per 3 steps
+    this.bombs = this.bombs.filter(b => b.y <= 9);
+    if (this.bombs.some(b => b.y === 9 && b.x === this.sx)) { this.lives--; this.hitFlash = 8; this.bombs = []; if (this.lives <= 0) { this.over = true; return; } }
+    if (this.bombs.length < 2 && this.inv.length && Math.random() < 0.05) {
+      const i = this.inv[rnd(this.inv.length)], x = i.x + this.ox; let y = -1;
+      this.inv.forEach(j => { if (j.x + this.ox === x) y = Math.max(y, j.y + this.oy); });
+      this.bombs.push({ x, y: y + 1 });
+    }
+    if (!this.inv.length) { this.wave++; this.newWave(); }
+  },
+  draw() {
+    cl(); this.inv.forEach(i => px(i.x + this.ox, i.y + this.oy, [COL.RED, COL.ORG, COL.YEL][i.r]));
+    this.bombs.forEach(b => px(b.x, b.y, COL.MAG)); if (this.pb) px(this.pb.x, this.pb.y, COL.WHT);
+    px(this.sx, 9, this.hitFlash % 2 ? COL.RED : COL.GRN); setCorners(this.lives, COL.RED);
+  }
+};
+
+const GAMES = { snake: Snake, tetris: Tetris, breakout: Breakout, pong: Pong, flappy: Flappy, invaders: Invaders };
+const GAME_NAMES = { snake: "Snake", tetris: "Tetris", breakout: "Breakout", pong: "Pong", flappy: "Flappy", invaders: "Invaders" };
+const play = { id: "snake", game: Snake, state: "ready", acc: 0, last: 0, flash: 0, timer: null, keep: null, sendOn: true, busy: false, pending: null, lastHex: "", lastSent: 0, ok: null, held: null };
+
+const bestKey = id => "wc-best-" + id;
+function getBest(id) { try { return +localStorage.getItem(bestKey(id)) || 0; } catch (e) { return 0; } }
+function setBest(id, v) { try { localStorage.setItem(bestKey(id), String(v)); } catch (e) {} }
+
+function playInfo() {
+  $("#pScore").textContent = play.game.score || 0;
+  $("#pBest").textContent = Math.max(getBest(play.id), play.game.score || 0);
+  $("#pState").textContent = t({ ready: "stReady", run: "stRun", pause: "stPause", over: "stOver" }[play.state]);
+  $("#playStart").textContent = t(play.state === "run" ? "playPause" : play.state === "pause" ? "playResume" : play.state === "over" ? "playAgain" : "playStart");
+  $("#gameHelp").textContent = t("gh_" + play.id);
+  const c = $("#playConn");
+  c.textContent = MOCK ? t("mockNote") : !play.sendOn ? "" : play.ok === false ? t("connErr") : play.ok ? t("connOk") : "";
+  c.classList.toggle("bad", !MOCK && play.ok === false);
+}
+
+function playRender() {
+  if (play.state === "over") {
+    if (play.flash < 1000 && Math.floor(play.flash / 160) % 2) { F.fill(COL.RED, 0, 110); F.fill(0, 110); }
+    else if (play.flash < 1000) play.game.draw();
+    else { cl(); drawNumber(play.game.score || 0, COL.YEL); }
+  } else play.game.draw();
+  drawLeds($("#playCv"), (x, y) => { const v = F[y * W + x]; return v ? C332[v] : null; }, 26, n => (F[n] ? C332[F[n]] : null));
+  playPush(false);
+}
+
+function playLoop() {
+  const now = performance.now(), dt = Math.min(200, now - play.last); play.last = now;
+  if (play.state === "run") {
+    play.acc += dt; let guard = 0;
+    while (play.acc >= play.game.interval() && guard++ < 6) {
+      play.acc -= play.game.interval(); play.game.step();
+      if (play.game.over) { playEnd(); break; }
+    }
+    $("#pScore").textContent = play.game.score || 0;
+  } else if (play.state === "over") play.flash += dt;
+  playRender();
+}
+
+function playEnd() {
+  play.state = "over"; play.flash = 0;
+  if ((play.game.score || 0) > getBest(play.id)) setBest(play.id, play.game.score);
+  playInfo();
+}
+
+function playSelect(id) {
+  play.id = id; play.game = GAMES[id]; play.game.reset(); play.state = "ready"; play.acc = 0; playInfo(); playRender();
+}
+
+function playStartPause() {
+  if (play.state === "ready" || play.state === "over") { play.game.reset(); play.state = "run"; play.acc = 0; }
+  else if (play.state === "run") play.state = "pause";
+  else if (play.state === "pause") play.state = "run";
+  playInfo();
+}
+
+function playKey(k) {
+  if (k === "start") { playStartPause(); return; }
+  if (play.state === "ready" || play.state === "over") { if (k === "a") playStartPause(); return; }
+  if (play.state !== "run") return;
+  play.game.key(k); playRender();
+}
+
+// Sends the picture to the clock (one request at a time, the newest picture wins). Unchanged pictures are repeated every second.
+function playPush(force) {
+  if (!play.sendOn || MOCK || $("#p-play").hidden) return;
+  const hx = toHex(F);
+  if (!force && hx === play.lastHex && Date.now() - play.lastSent < 1000) return;
+  if (play.busy) { play.pending = hx; return; }
+  playSend(hx);
+}
+async function playSend(hx) {
+  play.busy = true; play.lastHex = hx; play.lastSent = Date.now();
+  try { await playPost(hx); play.ok = true; } catch (e) { if (play.ok !== false) { play.ok = false; playInfo(); } }
+  if (play.ok === true && $("#playConn").textContent === "") playInfo();
+  play.busy = false;
+  if (play.pending) { const h = play.pending; play.pending = null; playSend(h); }
+}
+function playStopClock() { if (!MOCK) fetch("/api/play", { method: "POST", headers: { "Content-Type": "text/plain" }, body: "stop", keepalive: true }).catch(() => {}); }
+
+function playEnter() {
+  if (play.timer) return;
+  play.last = performance.now(); play.timer = setInterval(playLoop, 30);
+  play.keep = setInterval(() => playPush(true), 900);
+  playInfo(); playRender();
+}
+function playLeave() {
+  if (!play.timer) return;
+  clearInterval(play.timer); clearInterval(play.keep); play.timer = play.keep = null;
+  if (play.state === "run") play.state = "pause";
+  play.pending = null; play.ok = null; playStopClock();
+}
+
+const KEYMAP = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", w: "up", s: "down", a: "left", d: "right", W: "up", S: "down", A: "left", D: "right", " ": "a", z: "a", Z: "a", x: "b", X: "b", Enter: "start", p: "start", P: "start" };
+
+function wirePlay() {
+  $("#gameSeg").innerHTML = Object.keys(GAMES).map(id => `<input type="radio" name="game" id="g-${id}" value="${id}"${id === play.id ? " checked" : ""}><label for="g-${id}">${GAME_NAMES[id]}</label>`).join("");
+  $("#gameSeg").addEventListener("change", e => playSelect(e.target.value));
+  play.sendOn = !MOCK; $("#playOn").checked = play.sendOn; $("#playOn").disabled = MOCK;
+  $("#playOn").addEventListener("change", e => { play.sendOn = e.target.checked; if (!play.sendOn) playStopClock(); play.ok = null; playInfo(); });
+  document.addEventListener("keydown", e => {
+    if ($("#p-play").hidden || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) && e.target.type !== "radio" && e.target.type !== "checkbox") return;
+    const k = KEYMAP[e.key]; if (!k) return;
+    e.preventDefault(); playKey(k);
+  });
+  // on-screen buttons: pressing repeats the move while held (left / right / down / up)
+  const stopHold = () => { if (play.held) { clearTimeout(play.held.t1); clearInterval(play.held.t2); play.held = null; } };
+  $("#pad").addEventListener("pointerdown", e => {
+    const b = e.target.closest("[data-pk]"); if (!b) return; e.preventDefault(); stopHold();
+    const k = b.dataset.pk; playKey(k);
+    if (k !== "a" && k !== "b" && k !== "start") play.held = { t1: setTimeout(() => { play.held.t2 = setInterval(() => playKey(k), 110); }, 260) };
+  });
+  ["pointerup", "pointercancel", "pointerleave"].forEach(n => $("#pad").addEventListener(n, stopHold));
+  $("#pad").addEventListener("contextmenu", e => e.preventDefault());
+  // swipe on the picture (Snake and the other direction games)
+  let sw = null; const cv = $("#playCv");
+  cv.addEventListener("pointerdown", e => { sw = { x: e.clientX, y: e.clientY }; });
+  cv.addEventListener("pointerup", e => {
+    if (!sw) return; const dx = e.clientX - sw.x, dy = e.clientY - sw.y; sw = null;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) { playKey("a"); return; }
+    playKey(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up"));
+  });
+  document.addEventListener("visibilitychange", () => { if (document.hidden && play.state === "run") { play.state = "pause"; playInfo(); } });
+  window.addEventListener("pagehide", playStopClock);
+  playSelect(play.id);
+}
+window.wcPlay = { play, GAMES, F, playKey, playSelect };
+
 async function init() {
   $("#mockbar").hidden = !MOCK;
   // Page language is a per-browser choice; default follows the browser language.
   // Until the clock answers, the page follows the browser language; after that the clock's language setting.
   L = (navigator.language || "de").toLowerCase().startsWith("de") ? "de" : "en";
   $("#ui-" + L).checked = true;
-  wire();
+  wire(); wireEmoji(); wirePlay();  // [V5]
   let start = "led";
   try { const s = localStorage.getItem("wc-tab"); if (s) start = s; } catch (e) {}
-  const h = location.hash.slice(1); if (["led","night","disp","txt","time","net","sys"].includes(h)) start = h;
+  const h = location.hash.slice(1); if (["led","night","disp","txt","emoji","time","net","sys"].includes(h)) start = h;
+  if (start === "play") start = "led";  // the Play tab switches the clock to game mode, so it is never opened automatically
   selectTab(start);
   try {
     const data = await api.load();
     cfg = data.cfg; st = data.status;
+    if (!cfg.fx) cfg.fx = { emoji: false, emojiInt: 600, emojiMode: 0, mask: 4095, greet: true };  // older firmware
+    if (cfg.layout === undefined) { cfg.layout = 0; cfg.rowMirror = false; cfg.maxMA = 0; }  // [V6] older firmware: standard panel
+    customEmo = (data.custom || []).concat(["", "", "", ""]).slice(0, 4);
     if (!cfg.txt) cfg.txt = { dateStyle: 0, tempStyle: 0, humStyle: 0, dateSpeed: 150, tempSpeed: 150, humSpeed: 150, hold: 2000, tempDec: true, dateYear: true, dateSep: 0 };  // older firmware
     saved = clone(cfg);
   } catch (e) { toast(t("loadErr")); return; }

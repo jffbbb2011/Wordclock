@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Build WordClockWithWeb/webpage.h from web/index.html.
+"""[V2] Build WordClockWithWeb/webpage.h from web/index.html.
+
+[V2 CHANGE] Only the file names changed (index.html -> index.html, webpage.h -> webpage.h, folder -> WordClockWithWeb).
 
 The firmware serves the web interface as a gzipped byte array from flash.
 The GitHub Action runs it automatically and commits the result, so after editing web/index.html

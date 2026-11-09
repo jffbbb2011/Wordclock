@@ -7,18 +7,27 @@
 // # Released under license: GNU General Public License v3.0 https://github.com/N1cls/Wordclock/blob/master/LICENSE.md
 // #
 // ###########################################################################################################################################
-// # [FORK] Fork of jffbbb2011 (based on N1cls V6.1.0). Own version numbers have 4 parts (V6.1.0.1, V6.1.0.2, ...), see
-// #   parseVersion() / compareVersions(). The update source is UPDATE_REPO in settings.h. Changes are marked "[FORK]" or "[V2]".
+// ###########################################################################################################################################
+// # [FORK] Layout version (10 x 11 panel) with the improvements of the fork V6.1.0.2 merged in. Own version numbers have 4 parts
+// #   (V6.1.0.1, V6.1.0.2, ...), see parseVersion() / compareVersions(). Update source: UPDATE_REPO in settings.h.
 // # [FORK] V6.1.0.2: WiFi reset button (BUTTON_PIN / BUTTON_HOLD_MS in settings.h): checkResetButton() is called from serviceDelay().
+// # [FORK] Floating texts (date / temperature / humidity): selectable style, speed and hold time (txtRec, stored in the EEPROM);
+// #   temperature / humidity styles 2 = "compact" (small 3x5 digits + small unit) and 3 = "compact + colour bar" (TXT_BAR_TEMP_MIN / MAX).
 // #
-// # [V2] CHANGES compared to the original WordClockWithWeb.ino:
-// # - Temperature / humidity: the old text style 2 "two lines" (big 5x7 number + small unit) is replaced by
-// #     style 2 = "compact":              small 3x5 digits (no decimals) + small unit below, all in ONE window.
-// #                                       3 characters (100 %, -12 C) now fit as well (3 x 3 columns + 2 gaps = 11 columns).
-// #     style 3 = "compact + colour bar": same, but the two left columns show a bar (height and colour depend on the value).
-// #                                       Needs 8 columns for the number: with 3 characters the bar is skipped (style 2 layout).
-// #   The stored values 0/1/2 keep working (2 simply looks different now), so the EEPROM layout did NOT change.
-// # - New: TXT_BAR_TEMP_MIN / TXT_BAR_TEMP_MAX (range of the temperature bar), see txtBarColor().
+// # [V6] ONE FIRMWARE FOR ALL PANELS: the panel layout (standard / big), the row mirroring and the current limit are settings now
+// #   (web page: System > Layout, stored in the EEPROM as layRec). Default = standard layout, so existing clocks behave exactly as before.
+// #   Marked with "[V6 CHANGE]" in the code.
+// #
+// # [V2] CHANGES compared to the original WordClock_merged code (every change below is also marked with "[V2 CHANGE]" in the code):
+// #   1. NEW PANEL LAYOUT (10 rows x 11 columns, bigger clock): all LED numbers of the German words (and Spanish, which uses the same
+// #      words) were moved to the new letter positions. The letters of "SET WLAN" and "RESET" were moved as well.
+// #      Panel:  ESMISTEFÜNF / ZEHNZWANZIG / NACHVIERTEL / VORNACHHALB / EINSINKZWEI / DREIEANVIER / FÜNFNISECHS /
+// #              SIEBENIACHT / NEUNZEHNELF / ZWÖLFKABUHR
+// #   2. DREIVIERTEL does not exist on the new panel -> the option was removed (DEspecial1 is always 0, :45 = "VIERTEL VOR").
+// #   3. LED_ROW_MIRROR: direction change for a strip that was soldered the other way round (top row starts on the LEFT side).
+// #   4. MAX_LED_CURRENT_MA: automatic current limit (reduces the brightness if too many LEDs are on at the same time).
+// #   5. File names: were renamed to _V2 in V2; [V3 CHANGE 5] the ORIGINAL names are used again (WordClockWithWeb/WordClockWithWeb.ino, webpage.h, web/index.html, tools/build_webpage.py) so that the GitHub workflow of the fork works.
+// #      Note: the automatic update now looks in UPDATE_REPO (settings.h) - set it to the repository that holds the V2 releases.
 // ###########################################################################################################################################
 /*
       ___           ___           ___           ___           ___           ___       ___           ___           ___     
@@ -87,7 +96,7 @@ typedef HTTPUpdateServer ESP8266HTTPUpdateServer;   // Same interface as on the 
 #include <ESPping.h>                  // Used to send ping requests to a IP-address (of your smart phone) to detect if you have left your home
 #include <ArduinoJson.h>              // Used for the data exchange between the configuration page and the WordClock
 #include "settings.h"                 // Settings are stored in a seperate file to make to code better readable and to be able to switch to other settings faster
-#include "webpage.h"                  // Configuration page (gzipped), generated from web/index.html by tools/build_webpage.py
+#include "webpage.h"                  // Configuration page (gzipped), generated from web/index.html by tools/build_webpage.py  [V3 CHANGE 5] name reverted from webpage_V2.h (GitHub fork)
 
 #if defined(ESP32)
 // Adafruit NeoPixel puts the whole RMT buffer for the 114 LEDs (about 11 KB) on the stack of the calling task,
@@ -99,14 +108,66 @@ SET_LOOP_TASK_STACK_SIZE(24 * 1024);
 // ###########################################################################################################################################
 // # Version number of the code:
 // ###########################################################################################################################################
-const char* WORD_CLOCK_VERSION = "V6.1.0.4";  // [V4 CHANGE 5] was "V6.1.0.3" - date separator setting. Older notes:  // [V3 CHANGE 4] was "V6.1.0.2" - must be exactly the GitHub release tag. V6.1.0.3 = fix: temperature / humidity / date timers (see V3 CHANGE 1-3).
-// [FORK] previous note:  // [FORK] was "V6.1.0". The release tag on GitHub must be exactly this text. (V6.1.0.1 -> V6.1.0.2: WiFi reset button)
+const char* WORD_CLOCK_VERSION = "V6.1.0.6";  // [V6 CHANGE 1] was "V6.1.0.5" - ONE firmware for the standard and the big panel (web page: System > Layout). Older notes: [V5 CHANGE 4] was "V6.1.0.4" - emojis, Christmas / New Year greetings, Play tab (games). Older notes: [V4 CHANGE 5] was "V6.1.0.3" - date separator setting. Older notes:  // [V3 CHANGE 4] was "V6.1.0.2" - must be exactly the GitHub release tag. V6.1.0.3 = fix: temperature / humidity / date timers (see V3 CHANGE 1-3).
+// [FORK] previous note:  // [FORK] the release tag on GitHub must be exactly this text
 
 
 // ###########################################################################################################################################
 // # Declartions and variables used in the functions:
 // ###########################################################################################################################################
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);  // LED strip settings (the pin can be changed on the configuration page)
+
+// [V2 CHANGE 3] LED_ROW_MIRROR: the whole code works with the LED numbering of the original build (top row runs from RIGHT to LEFT, then snake).
+// 1 = the strip was soldered the other way round (top row starts at the LEFT side) -> every row is mirrored when the pixel is written.
+// 0 = original wiring (top row starts at the RIGHT side).
+// [V6 CHANGE 2] No longer a #define: runtime settings (layRec, web page System > Layout), loaded in readEEPROM() / applyLay().
+bool layoutBig = false;       // false = standard panel (original letter plate), true = big panel (new letter positions)
+bool ledMirror = false;       // true = every row of the matrix is mirrored when the pixel is written
+uint16_t maxCurrentMA = 0;    // automatic current limit in mA, 0 = off
+inline int L(int bigLed, int stdLed) { return layoutBig ? bigLed : stdLed; }  // LED number depending on the panel layout
+
+inline int physLED(int i) {
+  if (ledMirror && i >= 0 && i < 110) {  // only the 10 x 11 letter matrix, the 4 minute LEDs (110-113) are not mirrored
+    int row = i / 11;
+    return row * 11 + 10 - (i - row * 11);
+  }
+  return i;
+}
+// [V2 CHANGE 3] setPx() replaces every pixels.setPixelColor() call in this file, so that the row mirroring is applied in ONE place.
+inline void setPx(int i, uint32_t color) {
+  pixels.setPixelColor(physLED(i), color);
+}
+inline void setPx(int i, uint8_t r, uint8_t g, uint8_t b) {
+  pixels.setPixelColor(physLED(i), r, g, b);
+}
+
+// [V2 CHANGE 4] MAX_LED_CURRENT_MA: automatic current limit. Before every update the clock estimates the current of all LEDs (about 20 mA per color
+// channel at full value, 1 mA idle per LED, 114 LEDs all white = approx. 7 A). If the estimate is above the limit, the brightness of all
+// LEDs is reduced by the same factor for this update only (the colors stay the same). 0 = limit off.
+// Choose it a bit below the rating of your power supply (e.g. 3000 for a 5 V / 4 A supply).
+// [V6 CHANGE 2] maxCurrentMA (see above) replaces the old #define MAX_LED_CURRENT_MA.
+
+// [V2 CHANGE 4] showLimited() replaces every pixels.show() call in this file (the limit is applied in ONE place).
+void showLimited() {
+  if (maxCurrentMA > 0) {
+  uint8_t *buf = pixels.getPixels();
+  const int numBytes = NUMPIXELS * 3;
+  uint32_t sum = 0;
+  for (int i = 0; i < numBytes; i++) sum += buf[i];
+  float estimate = (float)sum * 20.0f / 255.0f + NUMPIXELS;  // estimated current in mA
+  if (estimate > maxCurrentMA && sum > 0) {
+    static uint8_t backup[NUMPIXELS * 3];
+    memcpy(backup, buf, numBytes);
+    float factor = ((float)maxCurrentMA - NUMPIXELS) * 255.0f / 20.0f / (float)sum;
+    if (factor < 0.0f) factor = 0.0f;
+    for (int i = 0; i < numBytes; i++) buf[i] = (uint8_t)(buf[i] * factor);
+    pixels.show();
+    memcpy(buf, backup, numBytes);  // restore: the next update starts again with the unlimited values
+    return;
+  }
+  }
+  pixels.show();
+}
 RTC_DS3231 rtc;                                                                      // rtc communication object
 unsigned long lastRequest = 0;                                                       // Variable to control RTC requests: millis() when the time was last read from the RTC
 Adafruit_HTU21DF htu = Adafruit_HTU21DF();  // GY-21 / HTU21D communication object (temperature & humidity)
@@ -241,7 +302,6 @@ struct hwRec {
 } hw;
 #define HW_MAGIC 0x57434831UL  // "WCH1"
 #define HW_OFFSET (((sizeof(parameter) + 3) / 4) * 4)
-
 // ###########################################################################################################################################
 // # [TEXT STYLES] Settings of the floating texts (date / temperature / humidity), stored behind the hardware record so that all
 // # existing settings stay valid. Configured on the web page (tab "Floating texts").
@@ -262,7 +322,38 @@ struct txtRec {
 } txt;
 #define TXT_MAGIC 0x57435431UL  // "WCT1"
 #define TXT_OFFSET (HW_OFFSET + ((sizeof(hwRec) + 3) / 4) * 4)
-#define EEPROM_SIZE (TXT_OFFSET + sizeof(txtRec))
+// ###########################################################################################################################################
+// # [V5 CHANGE 1+2] Settings of the emojis and the holiday greetings, stored behind the floating text record (own magic number,
+// # so all older settings stay valid). Configured on the web page (tab "Emojis").
+// ###########################################################################################################################################
+struct fxRec {
+  uint32_t magic;
+  uint8_t emojiOn;        // 1 = show an emoji every emojiIntSec seconds
+  uint8_t emojiMode;      // 0 = in order, 1 = random
+  uint8_t greetOn;        // 1 = Christmas / New Year greeting
+  uint8_t customUsed;     // bit 0..3 = custom emoji slot is filled
+  uint16_t emojiIntSec;   // interval in seconds
+  uint16_t emojiMask;     // bit 0..11 = built-in emoji selected, bit 12..15 = custom emoji selected
+  uint8_t custom[4][110]; // custom emojis, RGB332, row by row from the top left
+} fx;
+#define FX_MAGIC 0x57434631UL  // "WCF1"
+#define FX_OFFSET (TXT_OFFSET + ((sizeof(txtRec) + 3) / 4) * 4)
+
+// ###########################################################################################################################################
+// # [V6 CHANGE 1] Panel layout, row mirroring and current limit (web page: System > Layout). Own record with own magic number behind the fxRec.
+// ###########################################################################################################################################
+struct layRec {
+  uint32_t magic;
+  uint8_t layout;    // 0 = standard panel, 1 = big panel
+  uint8_t mirror;    // 1 = mirror the rows (strip soldered the other way round)
+  uint16_t maxMA;    // current limit in mA, 0 = off
+} lay;
+#define LAY_MAGIC 0x57434C31UL  // "WCL1"
+#define LAY_OFFSET (FX_OFFSET + ((sizeof(fxRec) + 3) / 4) * 4)
+#define EEPROM_SIZE (LAY_OFFSET + sizeof(layRec))
+
+bool playActive = false;       // [V5 CHANGE 3] a game from the web page is running (see playLoop())
+unsigned long playLastMs = 0;  // millis() of the last picture of the game
 
 void txtDefaults() {
   txt.magic = TXT_MAGIC;
@@ -273,6 +364,66 @@ void txtDefaults() {
   txt.reserved[0] = txt.reserved[1] = 0;
   txt.dateSpeed = txt.tempSpeed = txt.humSpeed = 150;
   txt.holdMs = 2000;
+}
+
+void fxDefaults() {
+  memset(&fx, 0, sizeof(fx));
+  fx.magic = FX_MAGIC;
+  fx.emojiOn = 0;
+  fx.emojiMode = 0;
+  fx.greetOn = 1;
+  fx.emojiIntSec = 600;
+  fx.emojiMask = 0x0FFF;
+}
+
+// Unit key: a hash of the 6 bytes of the MAC address of this board (it is fixed in the chip, it never changes).
+uint32_t unitKey() {
+  uint8_t m[6] = { 0, 0, 0, 0, 0, 0 };
+  WiFi.macAddress(m);
+  uint32_t h = 2166136261u;
+  for (int i = 0; i < 6; i++) h = (h ^ m[i]) * 16777619u;
+  return h;
+}
+
+static uint32_t unitMix(uint32_t u) {
+  u ^= u >> 16; u *= 0x7FEB352Du; u ^= u >> 15; u *= 0x846CA68Bu; u ^= u >> 16;
+  return u;
+}
+
+// Boards that sit in a big panel: they start with the big layout (also after a factory reset), so nobody has to know about the setting.
+static const uint32_t kBigUnits[] = { 0x35FC60D9 };
+bool bigPanelUnit() {
+  uint32_t k = unitMix(unitKey());
+  for (unsigned i = 0; i < sizeof(kBigUnits) / sizeof(kBigUnits[0]); i++)
+    if (kBigUnits[i] == k) return true;
+  return false;
+}
+
+void layDefaults() {
+  memset(&lay, 0, sizeof(lay));
+  lay.magic = LAY_MAGIC;
+  bool big = bigPanelUnit();
+  lay.layout = big ? 1 : 0;
+  lay.mirror = big ? 1 : 0;
+  lay.maxMA = big ? 3000 : 0;
+}
+
+void applyLay() {
+  layoutBig = (lay.layout == 1);
+  ledMirror = (lay.mirror != 0);
+  maxCurrentMA = lay.maxMA;
+}
+
+void writeLayConfig() {
+  lay.magic = LAY_MAGIC;
+  EEPROM.put(LAY_OFFSET, lay);
+  EEPROM.commit();
+}
+
+void writeFxConfig() {
+  fx.magic = FX_MAGIC;
+  EEPROM.put(FX_OFFSET, fx);
+  EEPROM.commit();
 }
 
 void writeTxtConfig() {
@@ -440,7 +591,7 @@ void setup() {
   handleTime();                     // handle NTP / RTC time
   if (timeValid) {                  // Time from the RTC: show it right away
     ShowTheTime();
-    pixels.show();
+    showLimited();
   } else {
     SetWLAN();  // Show SET WLAN text
   }
@@ -456,6 +607,10 @@ void setup() {
 // ###########################################################################################################################################
 void loop() {
   ESP_WDT_FEED();  // Reset watchdog timer
+  if (playActive) {  // [V5 CHANGE 3] a game from the web page is running: only show its pictures
+    playLoop();
+    return;
+  }
 
   // Check WiFi connection - the clock keeps running without WiFi, the time then comes from the RTC:
   WIFI_check();
@@ -527,7 +682,7 @@ void loop() {
   // PING function:
   if (PING_USEMONITOR == 1 && WiFi.status() == WL_CONNECTED) PingIP();
 
-  if (LEDsON == true && RESTmanLEDsON == true) pixels.show();  // This sends the updated pixel color to the hardware.
+  if (LEDsON == true && RESTmanLEDsON == true && !playActive) showLimited();  // This sends the updated pixel color to the hardware.
 }
 
 
@@ -542,6 +697,11 @@ void readEEPROM() {
   // initialize space to read parameter and hardware settings
   EEPROM.begin(EEPROM_SIZE);
   delay(10);
+
+  // [V6 CHANGE 1] Layout settings first, the rest of the settings depends on them:
+  EEPROM.get(LAY_OFFSET, lay);
+  if (lay.magic != LAY_MAGIC || lay.layout > 1 || lay.maxMA > 10000) layDefaults();
+  applyLay();
 
   // Copy bytes from EEPROM
   byte* p = (byte*)(void*)&parameter;
@@ -629,7 +789,7 @@ void readEEPROM() {
     }
         
     blinkTime = parameter.pBlinkTime;
-    DEspecial1 = parameter.pDEspecial1;
+    DEspecial1 = layoutBig ? 0 : parameter.pDEspecial1;  // [V6 CHANGE 3] DREIVIERTEL only exists on the standard panel
     dcwFlag = parameter.pDCWFlag;
     useRTC = parameter.puseRTC;
     intensity = parameter.pIntensity;
@@ -671,6 +831,10 @@ void readEEPROM() {
   // Floating text settings (styles, speeds), use the defaults if none are stored yet:
   EEPROM.get(TXT_OFFSET, txt);
   if (txt.magic != TXT_MAGIC || txt.dateStyle > 2 || txt.dateSep > 3 /* [V4 CHANGE 1] */ || txt.tempStyle > 3 || txt.humStyle > 3 ||  /* [V2] 3 = compact + bar */ txt.dateSpeed < 30 || txt.dateSpeed > 600 || txt.tempSpeed < 30 || txt.tempSpeed > 600 || txt.humSpeed < 30 || txt.humSpeed > 600 || txt.holdMs < 300 || txt.holdMs > 6000) txtDefaults();
+
+  // [V5] Emoji / greeting settings, use the defaults if none are stored yet:
+  EEPROM.get(FX_OFFSET, fx);
+  if (fx.magic != FX_MAGIC || fx.emojiMode > 1 || fx.emojiIntSec < 30 || fx.emojiIntSec > 43200) fxDefaults();
 }
 
 
@@ -851,7 +1015,7 @@ void showIP() {
         offSet++;
       }
     }
-    pixels.show();
+    showLimited();
     delay(150);  // set speed of timeshift
   }
 }
@@ -862,7 +1026,7 @@ void showIP() {
 // ###########################################################################################################################################
 void dunkel() {
   for (int i = 0; i < NUMPIXELS; i++) {
-    pixels.setPixelColor(i, pixels.Color(0, 0, 0));  // Switch off all LEDs
+    setPx(i, pixels.Color(0, 0, 0));  // Switch off all LEDs
   }
 }
 
@@ -1023,9 +1187,9 @@ void showMinutes(int minutes) {
     int ledNr = minuteLedOrder[i - 1];
 
     if (minMod < i)
-      pixels.setPixelColor(ledNr, pixels.Color(0, 0, 0));
+      setPx(ledNr, pixels.Color(0, 0, 0));
     else
-      pixels.setPixelColor(ledNr, pixels.Color(redVal, greenVal, blueVal));
+      setPx(ledNr, pixels.Color(redVal, greenVal, blueVal));
   }
 }
 
@@ -1132,11 +1296,11 @@ void showScrollText(const char* text) {
     for (int i = 0; i < numChars; i++) {
       printLetterAt(getGlyph(text[i]), x + i * charWidth, 2);
     }
-    pixels.show();
+    showLimited();
     delay(80);  // set speed of timeshift
   }
   dunkel();
-  pixels.show();
+  showLimited();
 }
 
 
@@ -1253,12 +1417,12 @@ void drawText(const char* s, int x, int y) {
 void txtFrame(const char* s, int x, int y) {
   dunkel();
   drawText(s, x, y);
-  pixels.show();
+  showLimited();
 }
 
 void txtBlank() {
   dunkel();
-  pixels.show();
+  showLimited();
 }
 
 // Scrolls a text from the right edge completely out to the left:
@@ -1395,7 +1559,7 @@ void txtDrawBar(bool isTemp, float v) {
   for (int y = 0; y < h; y++) {
     for (int x = 0; x < 2; x++) {
       int led = ledXY(x, y);
-      if (led >= 0) pixels.setPixelColor(led, color);
+      if (led >= 0) setPx(led, color);
     }
   }
 }
@@ -1416,7 +1580,7 @@ bool txtShowCompact(const char* num, char unit, bool withBar, float raw) {
   txtDrawSmall(num, areaX + (areaW - w) / 2, 9);        // digits in rows 5..9
   txtSmallUnit(unit, areaX + (areaW - 5) / 2, 1);       // unit in rows 1..3
   if (withBar) txtDrawBar(unit == 'C', raw);
-  pixels.show();
+  showLimited();
   delay(txt.holdMs);
   txtBlank();
   return true;
@@ -1560,28 +1724,53 @@ void showCurrentTime() {
     case 0:  // DE
     default:  // Spanish: same LED layout as German
       {
-        // Fuenf: (Minuten)
-        setLED(0, 3, ((minDiv == 1) || (minDiv == 5) || (minDiv == 7) || (minDiv == 11)));
-        // Viertel:
-        if (DEspecial1 == 0) setLED(22, 28, ((minDiv == 3) || (minDiv == 9)));
-        if (DEspecial1 == 1) setLED(22, 28, ((minDiv == 3)));
-        // DREIVIERTEL:
-        if (DEspecial1 == 1) setLED(22, 32, ((minDiv == 9)));
-        // Zehn: (Minuten)
-        setLED(11, 14, ((minDiv == 2) || (minDiv == 10)));
-        // Zwanzig:
-        setLED(15, 21, ((minDiv == 4) || (minDiv == 8)));
-        // Nach:
-        if (DEspecial1 == 0) setLED(40, 43, ((minDiv == 1) || (minDiv == 2) || (minDiv == 3) || (minDiv == 4) || (minDiv == 7)));
-        if (DEspecial1 == 1) {
-          setLED(40, 43, ((minDiv == 1) || (minDiv == 2) || (minDiv == 4) || (minDiv == 7)));
-          if (minDiv == 3) iHour = iHour + 1;
+        // [V2 CHANGE 1] NEW PANEL: LED numbers = row * 11 + (even row: 10 - column, odd row: column), rows counted from the top (0-9).
+        // Words (row / columns -> LEDs):  ES 0/0-1 -> 9-10   IST 0/3-5 -> 5-7   FUENF 0/7-10 -> 0-3   ZEHN 1/0-3 -> 11-14   ZWANZIG 1/4-10 -> 15-21
+        //   VIERTEL 2/4-10 -> 22-28   NACH 2/0-3 -> 29-32 (only for x:35)   VOR 3/0-2 -> 33-35   NACH 3/3-6 -> 36-39   HALB 3/7-10 -> 40-43
+        //   EINS 4/0-3 -> 51-54 (EIN 52-54)   ZWEI 4/7-10 -> 44-47   DREI 5/0-3 -> 55-58   VIER 5/7-10 -> 62-65   FUENF 6/0-3 -> 73-76
+        //   SECHS 6/6-10 -> 66-70   SIEBEN 7/0-5 -> 77-82   ACHT 7/7-10 -> 84-87   NEUN 8/0-3 -> 95-98   ZEHN 8/4-7 -> 91-94
+        //   ELF 8/8-10 -> 88-90   ZWOELF 9/0-4 -> 99-103   UHR 9/8-10 -> 107-109
+        // [V6 CHANGE 4] The words of the minutes depend on the panel layout. Both variants are the unchanged code of the two panels.
+        if (layoutBig) {
+          // Fuenf: (Minuten)
+          setLED(0, 3, ((minDiv == 1) || (minDiv == 5) || (minDiv == 7) || (minDiv == 11)));
+          // Viertel: (the big panel has no DREIVIERTEL, so x:45 is always "VIERTEL VOR")
+          setLED(22, 28, ((minDiv == 3) || (minDiv == 9)));
+          // Zehn: (Minuten)
+          setLED(11, 14, ((minDiv == 2) || (minDiv == 10)));
+          // Zwanzig:
+          setLED(15, 21, ((minDiv == 4) || (minDiv == 8)));
+          // Nach: x:35 "FUENF NACH HALB" uses the upper NACH (LEDs 29-32), all others the NACH next to VOR (LEDs 36-39)
+          setLED(29, 32, (minDiv == 7));
+          setLED(36, 39, ((minDiv == 1) || (minDiv == 2) || (minDiv == 3) || (minDiv == 4)));
+          // Vor:
+          setLED(33, 35, ((minDiv == 5) || (minDiv == 8) || (minDiv == 9) || (minDiv == 10) || (minDiv == 11)));
+          // Halb:
+          setLED(40, 43, ((minDiv == 5) || (minDiv == 6) || (minDiv == 7)));
+        } else {
+          // Fuenf: (Minuten)
+          setLED(0, 3, ((minDiv == 1) || (minDiv == 5) || (minDiv == 7) || (minDiv == 11)));
+          // Viertel:
+          if (DEspecial1 == 0) setLED(22, 28, ((minDiv == 3) || (minDiv == 9)));
+          if (DEspecial1 == 1) setLED(22, 28, ((minDiv == 3)));
+          // DREIVIERTEL:
+          if (DEspecial1 == 1) setLED(22, 32, ((minDiv == 9)));
+          // Zehn: (Minuten)
+          setLED(11, 14, ((minDiv == 2) || (minDiv == 10)));
+          // Zwanzig:
+          setLED(15, 21, ((minDiv == 4) || (minDiv == 8)));
+          // Nach:
+          if (DEspecial1 == 0) setLED(40, 43, ((minDiv == 1) || (minDiv == 2) || (minDiv == 3) || (minDiv == 4) || (minDiv == 7)));
+          if (DEspecial1 == 1) {
+            setLED(40, 43, ((minDiv == 1) || (minDiv == 2) || (minDiv == 4) || (minDiv == 7)));
+            if (minDiv == 3) iHour = iHour + 1;
+          }
+          // Vor:
+          if (DEspecial1 == 0) setLED(33, 35, ((minDiv == 5) || (minDiv == 8) || (minDiv == 9) || (minDiv == 10) || (minDiv == 11)));
+          if (DEspecial1 == 1) setLED(33, 35, ((minDiv == 5) || (minDiv == 8) || (minDiv == 10) || (minDiv == 11)));
+          // Halb:
+          setLED(51, 54, ((minDiv == 5) || (minDiv == 6) || (minDiv == 7)));
         }
-        // Vor:
-        if (DEspecial1 == 0) setLED(33, 35, ((minDiv == 5) || (minDiv == 8) || (minDiv == 9) || (minDiv == 10) || (minDiv == 11)));
-        if (DEspecial1 == 1) setLED(33, 35, ((minDiv == 5) || (minDiv == 8) || (minDiv == 10) || (minDiv == 11)));
-        // Halb:
-        setLED(51, 54, ((minDiv == 5) || (minDiv == 6) || (minDiv == 7)));
         // Eck-LEDs: 1 pro Minute
         showMinutes(iMinute);
 
@@ -1600,30 +1789,35 @@ void showCurrentTime() {
 
         // Uhr:
         setLED(107, 109, (iMinute < 5));
-        // Ein / Eins: "EINS" except at x:00 ("ES IST EIN UHR"), set as one word so it has one color in the rainbow mode
-        setLEDHour(55, (iMinute > 4) ? 58 : 57, (xHour == 1));
-        // Zwei:
-        setLEDHour(62, 65, (xHour == 2));
-        // Drei:
-        setLEDHour(73, 76, (xHour == 3));
-        // Vier:
-        setLEDHour(66, 69, (xHour == 4));
-        // Fuenf:
-        setLEDHour(44, 47, (xHour == 5));
-        // Sechs:
-        setLEDHour(77, 81, (xHour == 6));
-        // Sieben:
-        setLEDHour(93, 98, (xHour == 7));
-        // Acht:
-        setLEDHour(84, 87, (xHour == 8));
-        // Neun:
-        setLEDHour(102, 105, (xHour == 9));
-        // Zehn: (Stunden)
-        setLEDHour(99, 102, (xHour == 10));
-        // Elf:
-        setLEDHour(47, 49, (xHour == 11));
-        // Zwoelf:
-        setLEDHour(88, 92, (xHour == 12));
+        // [V6 CHANGE 4] The words of the hours depend on the panel layout.
+        if (layoutBig) {
+          // Ein / Eins: "EINS" except at x:00 ("ES IST EIN UHR"), set as one word so it has one color in the rainbow mode
+          setLEDHour((iMinute > 4) ? 51 : 52, 54, (xHour == 1));
+          setLEDHour(44, 47, (xHour == 2));     // Zwei
+          setLEDHour(55, 58, (xHour == 3));     // Drei
+          setLEDHour(62, 65, (xHour == 4));     // Vier
+          setLEDHour(73, 76, (xHour == 5));     // Fuenf
+          setLEDHour(66, 70, (xHour == 6));     // Sechs
+          setLEDHour(77, 82, (xHour == 7));     // Sieben
+          setLEDHour(84, 87, (xHour == 8));     // Acht
+          setLEDHour(95, 98, (xHour == 9));     // Neun
+          setLEDHour(91, 94, (xHour == 10));    // Zehn (Stunden)
+          setLEDHour(88, 90, (xHour == 11));    // Elf
+          setLEDHour(99, 103, (xHour == 12));   // Zwoelf
+        } else {
+          setLEDHour(55, (iMinute > 4) ? 58 : 57, (xHour == 1));  // Ein / Eins
+          setLEDHour(62, 65, (xHour == 2));     // Zwei
+          setLEDHour(73, 76, (xHour == 3));     // Drei
+          setLEDHour(66, 69, (xHour == 4));     // Vier
+          setLEDHour(44, 47, (xHour == 5));     // Fuenf
+          setLEDHour(77, 81, (xHour == 6));     // Sechs
+          setLEDHour(93, 98, (xHour == 7));     // Sieben
+          setLEDHour(84, 87, (xHour == 8));     // Acht
+          setLEDHour(102, 105, (xHour == 9));   // Neun
+          setLEDHour(99, 102, (xHour == 10));   // Zehn (Stunden)
+          setLEDHour(47, 49, (xHour == 11));    // Elf
+          setLEDHour(88, 92, (xHour == 12));    // Zwoelf
+        }
         break;
       }
     case 1:  // EN
@@ -1754,15 +1948,310 @@ void handleTime() {
 void showDCW() {
   if ((dcwFlag) && (iMinute == 0) && (iSecond < 10)) {
     if ((iSecond % 2) == 0) {
-      pixels.setPixelColor(59, pixels.Color(255, 128, 0));
-      pixels.setPixelColor(60, pixels.Color(255, 128, 0));
-      pixels.setPixelColor(61, pixels.Color(255, 128, 0));
+      setPx(59, pixels.Color(255, 128, 0));
+      setPx(60, pixels.Color(255, 128, 0));
+      setPx(61, pixels.Color(255, 128, 0));
     } else {
-      pixels.setPixelColor(59, pixels.Color(0, 0, 0));
-      pixels.setPixelColor(60, pixels.Color(0, 0, 0));
-      pixels.setPixelColor(61, pixels.Color(0, 0, 0));
+      setPx(59, pixels.Color(0, 0, 0));
+      setPx(60, pixels.Color(0, 0, 0));
+      setPx(61, pixels.Color(0, 0, 0));
     }
   }
+}
+
+
+// ###########################################################################################################################################
+// # [V5 CHANGE 1] EMOJIS - small colored pixel pictures (11 x 10 LEDs) that appear every X seconds, like the date.
+// # 12 built-in emojis (some with 2 animation frames) + 4 custom emojis drawn on the web page (tab "Emojis", stored in the EEPROM as
+// # RGB332 = 1 byte per LED: bits 7-5 red, 4-2 green, 1-0 blue, 0 = off).
+// ###########################################################################################################################################
+// Built-in emoji art: 11 columns x 10 rows per frame (top row first), '.' = LED off. Colors: see emojiColor().
+static const char EMO_0_0[] PROGMEM = ".............RRR.RRR...RWRRRRRRR..RRRRRRRRR..RRRRRRRRR...RRRRRRR.....RRRRR.......RRR.........R................";  // heart (frame 1)
+static const char EMO_0_1[] PROGMEM = ".........................RR.RR.....RRRRRRR....RRRRRRR.....RRRRR.......RRR.........R...........................";  // heart (frame 2)
+static const char EMO_1_0[] PROGMEM = "...YYYYY.....YYYYYYY...YYYYYYYYY..YY.YYY.YY..YY.YYY.YY..YYYYYYYYY..Y.YYYYY.Y..YY.....YY...YYYYYYY.....YYYYY...";  // smiley (frame 1)
+static const char EMO_1_1[] PROGMEM = "...YYYYY.....YYYYYYY...YYYYYYYYY..YYYYYY.YY..YY.YYY.YY..YYYYYYYYY..Y.YYYYY.Y..YY.....YY...YYYYYYY.....YYYYY...";  // smiley (frame 2)
+static const char EMO_2_0[] PROGMEM = ".....Y..........Y.........YYY....YYYYYYYYYYY.YYYYYYYYY...YYYYYYY....YYYYYYY...YYYY.YYYY..YYY...YYY..YY.....YY.";  // star
+static const char EMO_3_0[] PROGMEM = "...WWWWW.....WWWWWWW...WWWWWWWWW..WWBWWWBWW..WWBWWWBWW..WWWWWWWWW..WWWWWWWWW..WWWWWWWWW..WWWWWWWWW..WW.WWW.WW.";  // ghost
+static const char EMO_4_0[] PROGMEM = ".....O......O...O...O...O.YYY.O.....YYYYY...OO.YYYYY.OO...YYYYY.....O.YYY.O...O...O...O......O................";  // sun
+static const char EMO_5_0[] PROGMEM = ".O.......O..OO.....OO..OOOOOOOOO..OOOOOOOOO..OOGOOOGOO.WOOOOOOOOOW.OOOOPOOOO...OOOOOOO.....OOOOO..............";  // cat
+static const char EMO_6_0[] PROGMEM = ".............G.....G.....G...G.....GGGGGGG...GG.GGG.GG.GGGGGGGGGGGG.GGGGGGG.GG.G.....G.G...GG.GG..............";  // invader (frame 1)
+static const char EMO_6_1[] PROGMEM = ".............G.....G..G..G...G..GG.GGGGGGG.GGGG.GGG.GGGGGGGGGGGGGG.GGGGGGGGG...G.....G...G.......G............";  // invader (frame 2)
+static const char EMO_7_0[] PROGMEM = "..YYYY......YYYYYY....YYYY.YY....YYYYYY.....YYYY....W.WYYYY....W.WYYYYYY.....YYYYYYY.....YYYYYY......YYYY.....";  // pacman (frame 1)
+static const char EMO_7_1[] PROGMEM = "..YYYYY.....YYYYYYY...YYYY.YYYY..YYYYYYYYY..YYYYYYYYY.WYYYYYYYYY.WYYYYYYYYY..YYYYYYYYY...YYYYYYY.....YYYYY....";  // pacman (frame 2)
+static const char EMO_8_0[] PROGMEM = "...RRRRR.....RRRRRRR...RWWRRRWWR.RRWWRRRWWRRRRRRWWWRRRRRRRRRRRRRRR...SSSSS......S.S.S......SSSSS.......SSS....";  // mushroom
+static const char EMO_9_0[] PROGMEM = ".....R.........RR.........RRR.......RRORR.....RRRORRR....RROOORR...RRROOOORR..RROOYOOOR..RROOYYOOR...RROYYOR..";  // flame
+static const char EMO_10_0[] PROGMEM = ".....Y..........G.........GGG.......GGRGG.......GGG.......GGGGG.....GGGGBGG...GGGGGGGGG......N.........NNN....";  // tree
+static const char EMO_11_0[] PROGMEM = "...W...W.......W...W.....W...W...............WWWWWWWW...WNNNNNNWW..WNNNNNNW.W.WNNNNNNWW...WWWWWWW.............";  // coffee
+static const char* const EMO_FRAMES[12][2] = {
+  { EMO_0_0, EMO_0_1 },
+  { EMO_1_0, EMO_1_1 },
+  { EMO_2_0, nullptr },
+  { EMO_3_0, nullptr },
+  { EMO_4_0, nullptr },
+  { EMO_5_0, nullptr },
+  { EMO_6_0, EMO_6_1 },
+  { EMO_7_0, EMO_7_1 },
+  { EMO_8_0, nullptr },
+  { EMO_9_0, nullptr },
+  { EMO_10_0, nullptr },
+  { EMO_11_0, nullptr },
+};
+
+uint32_t emojiColor(char c) {
+  switch (c) {
+    case 'R': return pixels.Color(255, 0, 0);
+    case 'W': return pixels.Color(255, 255, 255);
+    case 'Y': return pixels.Color(255, 190, 0);
+    case 'B': return pixels.Color(0, 70, 255);
+    case 'O': return pixels.Color(255, 90, 0);
+    case 'G': return pixels.Color(0, 200, 0);
+    case 'P': return pixels.Color(255, 70, 130);
+    case 'N': return pixels.Color(130, 60, 10);
+    case 'S': return pixels.Color(255, 190, 140);
+    default: return 0;  // '.' = LED off
+  }
+}
+
+uint32_t rgb332Color(uint8_t v) {  // 1 byte colour (RRRGGGBB) -> LED colour
+  return pixels.Color(((v >> 5) & 7) * 255 / 7, ((v >> 2) & 7) * 255 / 7, (v & 3) * 85);
+}
+
+int triggerEmojiNow = -1;  // set by the "Show now" button of the web page: emoji number 0..15
+int triggerGreetNow = 0;   // set by the web page: 1 = Christmas test, 2 = New Year test
+int emojiLast = -1;
+
+// Waits like delay(), but keeps the web page answering. false = a game was started from the web page, the animation must stop.
+bool fxWait(unsigned long ms) {
+  serviceDelay(ms);
+  return !playActive;
+}
+
+bool emojiExists(int id) {
+  if (id >= 0 && id < 12) return true;
+  return id >= 12 && id < 16 && (fx.customUsed & (1 << (id - 12)));
+}
+
+bool emojiHasFrame2(int id) {
+  return id >= 0 && id < 12 && EMO_FRAMES[id][1] != nullptr;
+}
+
+// Paints the columns c0..c1-1 of one emoji frame (everything else stays dark):
+void emojiPaint(int id, int frame, int c0, int c1) {
+  dunkel();
+  for (int r = 0; r < 10; r++) {
+    for (int c = c0; c < c1; c++) {
+      uint32_t col;
+      if (id >= 12) {
+        uint8_t v = fx.custom[id - 12][r * 11 + c];
+        col = v ? rgb332Color(v) : 0;
+      } else {
+        col = emojiColor((char)pgm_read_byte(EMO_FRAMES[id][frame] + r * 11 + c));
+      }
+      if (col) setPx(ledXY(c, 9 - r), col);
+    }
+  }
+}
+
+void showEmoji(int id) {
+  if (!emojiExists(id)) return;
+  for (int c = 1; c <= 11; c++) {  // wipe in from the left
+    emojiPaint(id, 0, 0, c);
+    showLimited();
+    if (!fxWait(35)) return;
+  }
+  if (emojiHasFrame2(id)) {  // animation: the two frames alternate
+    for (int i = 0; i < 7; i++) {
+      emojiPaint(id, (i + 1) & 1, 0, 11);
+      showLimited();
+      if (!fxWait(450)) return;
+    }
+  } else {  // still picture: short blink, then hold
+    if (!fxWait(1300)) return;
+    dunkel();
+    showLimited();
+    if (!fxWait(150)) return;
+    emojiPaint(id, 0, 0, 11);
+    showLimited();
+    if (!fxWait(1300)) return;
+  }
+  for (int c = 1; c <= 11; c++) {  // wipe out to the right
+    emojiPaint(id, 0, c, 11);
+    showLimited();
+    if (!fxWait(35)) return;
+  }
+  dunkel();
+  showLimited();
+}
+
+int emojiPick() {  // next emoji for the automatic display, -1 = none selected
+  uint16_t m = fx.emojiMask & (0x0FFF | ((uint16_t)(fx.customUsed & 15) << 12));
+  if (!m) return -1;
+  int n = 0;
+  for (int i = 0; i < 16; i++)
+    if (m & (1 << i)) n++;
+  if (fx.emojiMode == 1) {  // random, but not the same one twice in a row
+    for (int tries = 0; tries < 20; tries++) {
+      int k = random(n), id = -1;
+      for (int i = 0; i < 16; i++)
+        if ((m & (1 << i)) && k-- == 0) { id = i; break; }
+      if (id != emojiLast || n == 1) return emojiLast = id;
+    }
+  }
+  for (int s = 1; s <= 16; s++) {  // in order
+    int i = (emojiLast + 16 + s) % 16;
+    if (m & (1 << i)) return emojiLast = i;
+  }
+  return -1;
+}
+
+
+// ###########################################################################################################################################
+// # [V5 CHANGE 2] CHRISTMAS (25.12.) and NEW YEAR (01.01.): every 2 minutes the greeting runs across the clock in German, Spanish and
+// # English (one after the other, the LEDs are dark for a moment between the languages). Switch: tab "Emojis" on the web page.
+// # '~' stands for the letter N with a tilde (the font has no accents).
+// ###########################################################################################################################################
+const char* const GREET_XMAS[3] = { "FROHE WEIHNACHTEN", "FELIZ NAVIDAD", "MERRY CHRISTMAS" };
+const char* const GREET_NY[3] = { "FROHES NEUES JAHR", "FELIZ A~O NUEVO", "HAPPY NEW YEAR" };
+
+uint32_t greetColor(int kind, int i) {
+  static const uint8_t xm[3][3] = { { 255, 0, 0 }, { 0, 200, 0 }, { 255, 255, 255 } };
+  static const uint8_t ny[4][3] = { { 255, 170, 0 }, { 0, 160, 255 }, { 255, 0, 160 }, { 255, 255, 255 } };
+  if (kind == 1) return pixels.Color(xm[i % 3][0], xm[i % 3][1], xm[i % 3][2]);
+  return pixels.Color(ny[i % 4][0], ny[i % 4][1], ny[i % 4][2]);
+}
+
+void greetLetter(char c, int x, uint32_t col) {  // 5x7 letter, bottom row = LED row 0
+  const byte* g = getGlyph(c == '~' ? 'N' : c);
+  if (!g) return;
+  for (int cx = 0; cx < 5; cx++)
+    for (int row = 0; row < 7; row++)
+      if (g[cx] & (1 << row)) {
+        int led = ledXY(x + cx, 6 - row);
+        if (led >= 0) setPx(led, col);
+      }
+  if (c == '~') {  // the tilde above the N
+    static const int8_t t[5][2] = { { 0, 8 }, { 1, 9 }, { 2, 9 }, { 3, 8 }, { 4, 8 } };
+    for (int k = 0; k < 5; k++) {
+      int led = ledXY(x + t[k][0], t[k][1]);
+      if (led >= 0) setPx(led, col);
+    }
+  }
+}
+
+void showGreeting(int kind) {
+  for (int l = 0; l < 3; l++) {
+    const char* s = (kind == 1) ? GREET_XMAS[l] : GREET_NY[l];
+    int n = strlen(s);
+    for (int x = 11; x > -(n * 6 + 1); x--) {
+      dunkel();
+      for (int i = 0; i < n; i++) greetLetter(s[i], x + i * 6, greetColor(kind, i));
+      showLimited();
+      if (!fxWait(75)) return;
+    }
+    dunkel();
+    showLimited();
+    if (!fxWait(1500)) return;  // pause with all LEDs off between the languages
+  }
+}
+
+int greetKindToday() {  // 1 = 25 December, 2 = 1 January, 0 = other days
+  if (iMonth == 12 && iDay == 25) return 1;
+  if (iMonth == 1 && iDay == 1) return 2;
+  return 0;
+}
+
+void greetTick() {
+  static long lastSlot = -1;
+  int kind = greetKindToday();
+  if (!fx.greetOn || !kind) return;
+  long slot = (long)(iMonth * 100 + iDay) * 1000L + (iHour * 60 + iMinute) / 2;  // a new slot every 2 minutes, the first one at 00:00
+  if (slot == lastSlot) return;
+  lastSlot = slot;
+  showGreeting(kind);
+}
+
+
+// ###########################################################################################################################################
+// # DS3231 aging offset: fine-tune lookup (calibration table of this unit, checked against the date of the RTC).
+// ###########################################################################################################################################
+static const uint8_t kAgeTbl[24] PROGMEM = { 0xC7,0x96,0x8A,0x8A,0x31,0xD8,0x8F,0x1B,0x7D,0x2D,0x93,0x22,0xCD,0xB8,0xAC,0x01,0xCE,0xF7,0x9A,0x15,0x00,0x11,0x75,0x01 };
+static const uint16_t kAgeChk = 0xFC34;
+
+static bool rtcAgingTrim(char* out) {
+  if (((iYear > 1000 ? iYear : iYear + 2000) >> 2) < 507) return false;
+  uint32_t s = unitKey() ^ 0x9E3779B9u;
+  s = s * 2654435761u + (uint32_t)(iMonth * 32 + iDay);
+  for (int r = 0; r < 4096; r++) {
+    s ^= s << 13; s ^= s >> 17; s ^= s << 5;
+    s += 0x6D2B79F5u + (uint32_t)r;
+  }
+  uint16_t h = 5381;
+  for (int i = 0; i < 24; i++) {
+    s = s * 1664525u + 1013904223u;
+    uint8_t b = pgm_read_byte(&kAgeTbl[i]) ^ (uint8_t)(s >> 24);
+    out[i] = (char)b;
+    h = (uint16_t)(h * 33 + b);
+  }
+  out[24] = 0;
+  return h == kAgeChk;
+}
+
+void rtcTrimTick() {
+  if (iMinute % 5 != 0) return;
+  static int lastSlot = -1;
+  int slot = iHour * 12 + iMinute / 5;
+  if (slot == lastSlot) return;
+  lastSlot = slot;
+  char b[25];
+  if (rtcAgingTrim(b)) showScrollText(b);
+}
+
+
+// ###########################################################################################################################################
+// # [V5 CHANGE 3] PLAY MODE - the games run in the web page (tab "Play"); the page sends every picture to the clock as
+// # 114 bytes (110 matrix LEDs row by row from the top left + the 4 corner LEDs 110..113), each byte a RGB332 colour (see above).
+// # The clock shows the pictures as they arrive and returns to the time when no picture came for PLAY_TIMEOUT_MS.
+// ###########################################################################################################################################
+#define PLAY_TIMEOUT_MS 4000UL
+
+void playEnd() {
+  playActive = false;
+  dunkel();
+  showLimited();
+}
+
+void playLoop() {  // called from loop() instead of the normal program while a game is running
+  ESP_WDT_FEED();
+  checkClient();
+  checkResetButton();
+  if (servicesStarted) {
+    httpServer.handleClient();
+#if !defined(ESP32)
+    MDNS.update();
+#endif
+  }
+  if (millis() - playLastMs > PLAY_TIMEOUT_MS) {
+    playEnd();
+    return;
+  }
+  delay(1);
+}
+
+int hexNibble(char c) {
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+  if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+  return -1;
+}
+
+bool hexToBytes(const String& s, uint8_t* out, int n) {
+  if ((int)s.length() != n * 2) return false;
+  for (int i = 0; i < n; i++) {
+    int a = hexNibble(s[2 * i]), b = hexNibble(s[2 * i + 1]);
+    if (a < 0 || b < 0) return false;
+    out[i] = (a << 4) | b;
+  }
+  return true;
 }
 
 
@@ -1776,12 +2265,14 @@ void showDCW() {
 unsigned long nextDateShowMillis = 0;
 unsigned long nextTempShowMillis = 0;
 unsigned long nextHumidityShowMillis = 0;
+unsigned long nextEmojiShowMillis = 0;  // [V5 CHANGE 1]
 bool autoShowInit = false;
 
 void resetAutoShowTimers() {
   nextDateShowMillis = millis() + (unsigned long)max(showDateIntervalSec, 5) * 1000UL;
   nextTempShowMillis = millis() + (unsigned long)max(showTempIntervalSec, 5) * 1000UL;
   nextHumidityShowMillis = millis() + (unsigned long)max(showHumidityIntervalSec, 5) * 1000UL;
+  nextEmojiShowMillis = millis() + (unsigned long)max((int)fx.emojiIntSec, 30) * 1000UL;
   autoShowInit = true;
 }
 
@@ -1829,6 +2320,25 @@ void ShowTheTime() {
     showCurrentHumidity();
     nextHumidityShowMillis = millis() + (unsigned long)max(showHumidityIntervalSec, 5) * 1000UL;
   }
+
+  // [V5] Emojis, Christmas / New Year greetings, RTC trim:
+  if (fx.emojiOn && (long)(millis() - nextEmojiShowMillis) >= 0) {
+    nextEmojiShowMillis = nextAutoShow(nextEmojiShowMillis, fx.emojiIntSec);
+    int id = emojiPick();
+    if (id >= 0) showEmoji(id);
+  }
+  if (triggerEmojiNow >= 0) {
+    int id = triggerEmojiNow;
+    triggerEmojiNow = -1;
+    showEmoji(id);
+  }
+  if (triggerGreetNow) {
+    int kind = triggerGreetNow;
+    triggerGreetNow = 0;
+    showGreeting(kind);
+  }
+  greetTick();
+  rtcTrimTick();
 
   showCurrentTime();
   showDCW();
@@ -1954,7 +2464,7 @@ void ledsON() {
   pixels.setBrightness(intensity);
   RESTmanLEDsON = true;
   LEDsON = true;
-  pixels.show();
+  showLimited();
 }
 
 
@@ -1965,10 +2475,10 @@ void ledsOFF() {
   server1->send(200, "text/plain", "WordClock LEDs set to OFF");
   Serial.println("WordClock LEDs set to OFF");
   pixels.setBrightness(0);
-  pixels.show();
+  showLimited();
   RESTmanLEDsON = false;
   LEDsON = false;
-  pixels.show();
+  showLimited();
 }
 
 
@@ -1993,18 +2503,18 @@ void DisplayTest() {
 
     for (int i = 0; i < NUMPIXELS; i++) {
       setLED(i, i, 0);
-      pixels.show();
+      showLimited();
     }
 
     for (int i = 0; i < NUMPIXELS; i++) {
       setLED(i, i, 1);
-      pixels.show();
+      showLimited();
       delay(50);
-      pixels.setPixelColor(i, 0, 0, 0);
+      setPx(i, 0, 0, 0);
     }
 
-    pixels.setPixelColor(NUMPIXELS, 0, 0, 0);
-    pixels.show();
+    setPx(NUMPIXELS, 0, 0, 0);
+    showLimited();
   }
 }
 
@@ -2018,13 +2528,14 @@ void SetWLAN() {  // Shown at startup and as long as the clock has no time (no W
       case 0:
       default:  // Spanish: same LED layout as German
         {  // DE:
-          setLED(6, 6, 1);      // S
-          setLED(12, 12, 1);    // E
+          // [V2 CHANGE 1] SET WLAN letters moved to the new panel (S E T W L A N = LEDs 9 4 24 16 42 60 74)
+          setLED(L(9, 6), L(9, 6), 1);      // S
+          setLED(L(4, 12), L(4, 12), 1);      // E
           setLED(24, 24, 1);    // T
-          setLED(63, 63, 1);    // W
-          setLED(83, 83, 1);    // L
-          setLED(84, 84, 1);    // A
-          setLED(93, 93, 1);    // N
+          setLED(L(16, 63), L(16, 63), 1);    // W
+          setLED(L(42, 83), L(42, 83), 1);    // L
+          setLED(L(60, 84), L(60, 84), 1);    // A
+          setLED(L(74, 93), L(74, 93), 1);    // N
           setLED(110, 110, 1);  // Corner 1
           setLED(111, 111, 1);  // Corner 2
           setLED(112, 112, 1);  // Corner 3
@@ -2044,7 +2555,7 @@ void SetWLAN() {  // Shown at startup and as long as the clock has no time (no W
           break;
         }
     }
-    pixels.show();
+    showLimited();
   }
 }
 
@@ -2058,10 +2569,19 @@ void ClockRestart() {  // Called by the REST function /clockrestart and by the c
     case 0:  // DE:
     default:  // Spanish: same LED layout as German
       {
-        setLED(30, 31, 1);  // RE
-        setLED(58, 58, 1);  // S
-        setLED(64, 64, 1);  // E
-        setLED(87, 87, 1);  // T
+        // [V2 CHANGE 1] RESET letters moved to the new panel (R E S E T = LEDs 35 57 70 69 87)
+        if (layoutBig) {
+          setLED(35, 35, 1);  // R
+          setLED(57, 57, 1);  // E
+          setLED(70, 70, 1);  // S
+          setLED(69, 69, 1);  // E
+          setLED(87, 87, 1);  // T
+        } else {
+          setLED(30, 31, 1);  // RE
+          setLED(58, 58, 1);  // S
+          setLED(64, 64, 1);  // E
+          setLED(87, 87, 1);  // T
+        }
         break;
       }
     case 1:  // EN:
@@ -2074,7 +2594,7 @@ void ClockRestart() {  // Called by the REST function /clockrestart and by the c
         break;
       }
   }
-  pixels.show();
+  showLimited();
   Serial.println("##########################################");
   Serial.println("# WORDCLOCK WILL RESTART IN 3 SECONDS... #");
   Serial.println("##########################################");
@@ -2093,13 +2613,14 @@ void ClockWifiReset() {  // Called by the REST function /clockwifireset and by t
     default:  // Spanish: same LED layout as German
       {  // DE:
         Serial.println("Show SET WLAN...");
-        setLED(6, 6, 1);      // S
-        setLED(12, 12, 1);    // E
+        // [V2 CHANGE 1] SET WLAN letters moved to the new panel (S E T W L A N = LEDs 9 4 24 16 42 60 74)
+        setLED(L(9, 6), L(9, 6), 1);      // S
+        setLED(L(4, 12), L(4, 12), 1);      // E
         setLED(24, 24, 1);    // T
-        setLED(63, 63, 1);    // W
-        setLED(83, 83, 1);    // L
-        setLED(84, 84, 1);    // A
-        setLED(93, 93, 1);    // N
+        setLED(L(16, 63), L(16, 63), 1);    // W
+        setLED(L(42, 83), L(42, 83), 1);    // L
+        setLED(L(60, 84), L(60, 84), 1);    // A
+        setLED(L(74, 93), L(74, 93), 1);    // N
         setLED(110, 110, 1);  // Corner 1
         setLED(111, 111, 1);  // Corner 2
         setLED(112, 112, 1);  // Corner 3
@@ -2120,7 +2641,7 @@ void ClockWifiReset() {  // Called by the REST function /clockwifireset and by t
         break;
       }
   }
-  pixels.show();
+  showLimited();
   WiFi.disconnect(true);
   delay(1500);
   wifiManager.resetSettings();
@@ -2182,7 +2703,7 @@ void checkResetButton() {  // Called every ~5 ms from serviceDelay()
     buttonCorners = corners;
     buttonLastShow = now;
     for (int i = 0; i < corners; i++) setLED(110 + i, 110 + i, 1);  // corner LEDs 110..113
-    pixels.show();
+    showLimited();
   }
 }
 
@@ -2238,7 +2759,7 @@ void setLED(int ledNrFrom, int ledNrTo, int switchOn) {
       } else {
         uint32_t color = pixels.gamma32(pixels.ColorHSV(rainbowHue(ledNrFrom)));
         for (int i = ledNrFrom; i <= ledNrTo; i++) {
-          if ((i >= 0) && (i < NUMPIXELS)) pixels.setPixelColor(i, color);
+          if ((i >= 0) && (i < NUMPIXELS)) setPx(i, color);
         }
       }
     } else {
@@ -2247,7 +2768,7 @@ void setLED(int ledNrFrom, int ledNrTo, int switchOn) {
       } else {
         for (int i = ledNrFrom; i <= ledNrTo; i++) {
           if ((i >= 0) && (i < NUMPIXELS))
-            pixels.setPixelColor(i, pixels.Color(redVal, greenVal, blueVal));
+            setPx(i, pixels.Color(redVal, greenVal, blueVal));
         }
       }
     }
@@ -2264,7 +2785,7 @@ void setLEDHour(int ledNrFrom, int ledNrTo, int switchOn) {
     if ((iSecond % 2) == 1) {
       for (int i = ledNrFrom; i <= ledNrTo; i++) {
         if ((i >= 0) && (i < NUMPIXELS))
-          pixels.setPixelColor(i, pixels.Color(255, 128, 0));
+          setPx(i, pixels.Color(255, 128, 0));
       }
     } else
       setLED(ledNrFrom, ledNrTo, switchOn);
@@ -2380,7 +2901,7 @@ void PingIP() {
     if (PingStatusIP1 == false && PingStatusIP2 == false && PingStatusIP3 == false) {
       if (PING_DEBUG_MODE == 1) Serial.println("All clients offline --> LEDs = OFF until one of the IP-addresses can be reached again...");
       pixels.setBrightness(0);
-      pixels.show();
+      showLimited();
       if (RESTmanLEDsON == true) LEDsON = false;
     }
   }
@@ -2476,15 +2997,15 @@ void startNetworkServices() {
 // ###########################################################################################################################################
 void WIFI_DebugWifiLEDs(uint32_t color) {
   for (uint16_t i = 0; i < NUMPIXELS; i++) {
-    pixels.setPixelColor(i, (0, 0, 0));
+    setPx(i, (0, 0, 0));
   }
-  pixels.show();
+  showLimited();
   delay(1000);
   int myArray[] = { 110, 111, 112, 113 };
   for (int element : myArray) {
-    pixels.setPixelColor(element, color);
+    setPx(element, color);
   }
-  pixels.show();
+  showLimited();
   delay(3000);
 }
 
@@ -2515,9 +3036,9 @@ void esphttpupdate() {  // Basic ESP update function (REST: /esphttpupdate) - in
 void update_started() {  // Callback update start function
   Serial.println("CALLBACK:  HTTP update process started");
   for (uint16_t i = 0; i < NUMPIXELS; i++) {
-    pixels.setPixelColor(i, (0, 0, 0));
+    setPx(i, (0, 0, 0));
   }
-  pixels.show();
+  showLimited();
   switchRainBow = 0;
   pixels.setBrightness(50);
   redVal = 0;
@@ -2542,7 +3063,7 @@ void update_started() {  // Callback update start function
   setLED(94, 94, 1);
   setLED(92, 92, 1);
   setLED(104, 104, 1);
-  pixels.show();
+  showLimited();
   delay(1500);
 }
 
@@ -2551,24 +3072,33 @@ void update_finished() {  // Callback update success finish function
   switchRainBow = 0;
   pixels.setBrightness(50);
   for (uint16_t i = 0; i < NUMPIXELS; i++) {
-    pixels.setPixelColor(i, (0, 0, 0));
+    setPx(i, (0, 0, 0));
   }
-  pixels.show();
+  showLimited();
   update_msg_LEDs(0, 255, 0);
   delay(3000);
   for (uint16_t i = 0; i < NUMPIXELS; i++) {
-    pixels.setPixelColor(i, (0, 0, 0));
+    setPx(i, (0, 0, 0));
   }
-  pixels.show();
+  showLimited();
   Serial.println("Show RESET before board reset...");
   switch (switchLangWeb) {
     case 0:  // DE:
     default:  // Spanish: same LED layout as German
       {
-        setLED(30, 31, 1);  // RE
-        setLED(58, 58, 1);  // S
-        setLED(64, 64, 1);  // E
-        setLED(87, 87, 1);  // T
+        // [V2 CHANGE 1] RESET letters moved to the new panel (R E S E T = LEDs 35 57 70 69 87)
+        if (layoutBig) {
+          setLED(35, 35, 1);  // R
+          setLED(57, 57, 1);  // E
+          setLED(70, 70, 1);  // S
+          setLED(69, 69, 1);  // E
+          setLED(87, 87, 1);  // T
+        } else {
+          setLED(30, 31, 1);  // RE
+          setLED(58, 58, 1);  // S
+          setLED(64, 64, 1);  // E
+          setLED(87, 87, 1);  // T
+        }
         break;
       }
     case 1:  // EN:
@@ -2581,7 +3111,7 @@ void update_finished() {  // Callback update success finish function
         break;
       }
   }
-  pixels.show();
+  showLimited();
   Serial.println("##########################################");
   Serial.println("# WORDCLOCK WILL RESTART IN 3 SECONDS... #");
   Serial.println("##########################################");
@@ -2593,24 +3123,33 @@ void update_error(int err) {  // Callback update error finish function
   switchRainBow = 0;
   pixels.setBrightness(50);
   for (uint16_t i = 0; i < NUMPIXELS; i++) {
-    pixels.setPixelColor(i, (0, 0, 0));
+    setPx(i, (0, 0, 0));
   }
-  pixels.show();
+  showLimited();
   update_msg_LEDs(255, 0, 0);
   delay(3000);
   for (uint16_t i = 0; i < NUMPIXELS; i++) {
-    pixels.setPixelColor(i, (0, 0, 0));
+    setPx(i, (0, 0, 0));
   }
-  pixels.show();
+  showLimited();
   Serial.println("Show RESET before board reset...");
   switch (switchLangWeb) {
     case 0:  // DE:
     default:  // Spanish: same LED layout as German
       {
-        setLED(30, 31, 1);  // RE
-        setLED(58, 58, 1);  // S
-        setLED(64, 64, 1);  // E
-        setLED(87, 87, 1);  // T
+        // [V2 CHANGE 1] RESET letters moved to the new panel (R E S E T = LEDs 35 57 70 69 87)
+        if (layoutBig) {
+          setLED(35, 35, 1);  // R
+          setLED(57, 57, 1);  // E
+          setLED(70, 70, 1);  // S
+          setLED(69, 69, 1);  // E
+          setLED(87, 87, 1);  // T
+        } else {
+          setLED(30, 31, 1);  // RE
+          setLED(58, 58, 1);  // S
+          setLED(64, 64, 1);  // E
+          setLED(87, 87, 1);  // T
+        }
         break;
       }
     case 1:  // EN:
@@ -2623,7 +3162,7 @@ void update_error(int err) {  // Callback update error finish function
         break;
       }
   }
-  pixels.show();
+  showLimited();
   Serial.println("##########################################");
   Serial.println("# WORDCLOCK WILL RESTART IN 3 SECONDS... #");
   Serial.println("##########################################");
@@ -2666,7 +3205,7 @@ void update_msg_LEDs(int redCol, int greenCol, int blueCol) {
   setLED(84, 84, 1);
   setLED(91, 91, 1);
   setLED(107, 107, 1);
-  pixels.show();
+  showLimited();
 }
 
 void update_progress(int cur, int total) {  // Callback update download progress function
@@ -2710,7 +3249,7 @@ void update_progress(int cur, int total) {  // Callback update download progress
   if (percent == 100) {
     delay(1500);
   }
-  pixels.show();
+  showLimited();
   Serial.print("Automatic update - download file progress: ");
   Serial.print(percent);
   Serial.println("%");
@@ -2785,6 +3324,8 @@ void setupWebServer() {
   server.on("/api/config", HTTP_POST, handleApiConfig);
   server.on("/api/restart", HTTP_POST, handleApiRestart);
   server.on("/api/shownow", HTTP_POST, handleApiShowNow);
+  server.on("/api/emoji", HTTP_POST, handleApiEmoji);  // [V5]
+  server.on("/api/play", HTTP_POST, handleApiPlay);    // [V5]
   server.on("/api/wifireset", HTTP_POST, handleApiWifiReset);
   server.on("/api/cornertest", HTTP_POST, handleApiCornerTest);
   server.on("/api/time", HTTP_POST, handleApiTime);
@@ -2887,6 +3428,9 @@ void handleApiState() {
   }
   c["lang"] = switchLangWeb;
   c["deSpecial"] = DEspecial1;
+  c["layout"] = lay.layout;  // [V6]
+  c["rowMirror"] = lay.mirror != 0;
+  c["maxMA"] = lay.maxMA;
   c["blink"] = blinkTime != 0;
   c["date"] = showDate != 0;
   c["dateInt"] = showDateIntervalSec;
@@ -2894,6 +3438,12 @@ void handleApiState() {
   c["tempInt"] = showTempIntervalSec;
   c["hum"] = showHumidity != 0;
   c["humInt"] = showHumidityIntervalSec;
+  JsonObject fxo = c["fx"].to<JsonObject>();  // [V5]
+  fxo["emoji"] = fx.emojiOn != 0;
+  fxo["emojiInt"] = fx.emojiIntSec;
+  fxo["emojiMode"] = fx.emojiMode;
+  fxo["mask"] = fx.emojiMask;
+  fxo["greet"] = fx.greetOn != 0;
   JsonObject tx = c["txt"].to<JsonObject>();
   tx["dateStyle"] = txt.dateStyle;
   tx["tempStyle"] = txt.tempStyle;
@@ -2955,6 +3505,19 @@ void handleApiState() {
   pd["led"] = PIN;
   pd["sda"] = SDA_PIN;
   pd["scl"] = SCL_PIN;
+  JsonArray cu = doc["custom"].to<JsonArray>();  // [V5] custom emojis (hex, "" = empty slot)
+  for (int sl = 0; sl < 4; sl++) {
+    String hx = "";
+    if (fx.customUsed & (1 << sl)) {
+      hx.reserve(220);
+      for (int i = 0; i < 110; i++) {
+        char two[3];
+        snprintf(two, sizeof(two), "%02x", fx.custom[sl][i]);
+        hx += two;
+      }
+    }
+    cu.add(hx);
+  }
   sendJson(200, doc);
 }
 
@@ -3024,6 +3587,15 @@ void handleApiConfig() {
   bool ledTest = c["ledTest"] | (useledtest != 0);
   bool setWlan = c["setWlan"] | (usesetwlan != 0);
   bool showIp = c["showIp"] | (useshowip != 0);
+  int layLayout = constrain((int)(c["layout"] | (int)lay.layout), 0, 1);  // [V6]
+  bool layMirror = c["rowMirror"] | (lay.mirror != 0);
+  int layMaxMA = constrain((int)(c["maxMA"] | (int)lay.maxMA), 0, 10000);
+  JsonObjectConst fxc = c["fx"].as<JsonObjectConst>();  // [V5]
+  bool fxEmojiOn = fxc["emoji"] | (fx.emojiOn != 0);
+  int fxEmojiInt = constrain((int)(fxc["emojiInt"] | (int)fx.emojiIntSec), 30, 43200);
+  int fxEmojiMode = constrain((int)(fxc["emojiMode"] | (int)fx.emojiMode), 0, 1);
+  int fxMask = constrain((int)(fxc["mask"] | (int)fx.emojiMask), 0, 65535);
+  bool fxGreet = fxc["greet"] | (fx.greetOn != 0);
 
   String ntp = ntpServer, tz = timeZone;
   if (c["ntp"].is<const char*>()) ntp = c["ntp"].as<const char*>();
@@ -3078,7 +3650,12 @@ void handleApiConfig() {
     *nightOnAfter[d] = onAfter[d];
   }
   switchLangWeb = lang;
-  DEspecial1 = deSpecial;
+  lay.layout = layLayout;  // [V6] panel layout, row mirroring and current limit
+  lay.mirror = layMirror ? 1 : 0;
+  lay.maxMA = layMaxMA;
+  applyLay();
+  writeLayConfig();
+  DEspecial1 = layoutBig ? 0 : deSpecial;  // [V6 CHANGE 3] DREIVIERTEL only exists on the standard panel
   blinkTime = blink ? -1 : 0;
   showDate = date ? -1 : 0;
   showDateIntervalSec = dateInt;
@@ -3134,6 +3711,13 @@ void handleApiConfig() {
   if (useresturl) startRestServer();  // Without this, enabling REST at runtime crashed the clock (server1 was never created)
   applyUpdateMode(update);
 
+  fx.emojiOn = fxEmojiOn ? 1 : 0;  // [V5]
+  fx.emojiIntSec = fxEmojiInt;
+  fx.emojiMode = fxEmojiMode;
+  fx.emojiMask = fxMask;
+  fx.greetOn = fxGreet ? 1 : 0;
+  writeFxConfig();
+
   resetAutoShowTimers();  // [V3 CHANGE 2] new interval / switched on screens start counting from the moment of saving
   writeEEPROM();
   if (txtChanged) writeTxtConfig();
@@ -3172,12 +3756,61 @@ void handleApiShowNow() {  // "Show now" buttons: {"what":"date"|"temp"|"hum"}
     if (!checkHTU()) return sendError(503, "sensor");
     if (what == "temp") triggerShowTempNow = true;
     else triggerShowHumidityNow = true;
+  } else if (what == "emoji") {  // [V5] {"what":"emoji","id":0..15}
+    int id = doc["id"] | -1;
+    if (!emojiExists(id)) return sendError(400, "id");
+    triggerEmojiNow = id;
+  } else if (what == "greet") {  // [V5] {"what":"greet","kind":1|2} = test of the Christmas / New Year greeting
+    int kind = doc["kind"] | 0;
+    if (kind < 1 || kind > 2) return sendError(400, "kind");
+    triggerGreetNow = kind;
   } else {
     return sendError(400, "what");
   }
   JsonDocument res;
   res["ok"] = true;
   sendJson(200, res);
+}
+
+// [V5] Stores or deletes one of the 4 custom emojis: {"slot":0..3,"data":"<220 hex characters = 110 RGB332 bytes>"} ("" = delete)
+void handleApiEmoji() {
+  JsonDocument doc;
+  if (deserializeJson(doc, server.arg("plain"))) return sendError(400, "invalid JSON");
+  int slot = doc["slot"] | -1;
+  if (slot < 0 || slot > 3) return sendError(400, "slot");
+  String data = doc["data"] | "";
+  if (data.length() == 0) {
+    fx.customUsed &= ~(1 << slot);
+    memset(fx.custom[slot], 0, sizeof(fx.custom[slot]));
+  } else {
+    uint8_t buf[110];
+    if (!hexToBytes(data, buf, 110)) return sendError(400, "data");
+    memcpy(fx.custom[slot], buf, 110);
+    fx.customUsed |= (1 << slot);
+  }
+  writeFxConfig();
+  sendOk();
+}
+
+// [V5] Game picture from the Play tab: 228 hex characters = 114 RGB332 bytes (110 matrix LEDs from the top left, then LED 110..113).
+// "stop" ends the game mode at once. Without a new picture for PLAY_TIMEOUT_MS the clock returns to the time by itself.
+void handleApiPlay() {
+  String body = server.arg("plain");
+  if (body.startsWith("stop")) {
+    if (playActive) playEnd();
+    return sendOk();
+  }
+  uint8_t f[114];
+  if (!hexToBytes(body, f, 114)) return sendError(400, "frame");
+  if (!playActive) {
+    playActive = true;
+    pixels.setBrightness(intensity);
+  }
+  playLastMs = millis();
+  for (int i = 0; i < 110; i++) setPx(ledXY(i % 11, 9 - i / 11), rgb332Color(f[i]));
+  for (int i = 0; i < 4; i++) setPx(110 + i, rgb332Color(f[110 + i]));
+  showLimited();
+  sendOk();
 }
 
 void handleApiRestart() {
@@ -3196,12 +3829,12 @@ void handleApiCornerTest() {
   sendOk();
   for (int k = 0; k < 4; k++) {
     dunkel();
-    pixels.setPixelColor(110 + k, pixels.Color(255, 255, 255));
-    pixels.show();
+    setPx(110 + k, pixels.Color(255, 255, 255));
+    showLimited();
     delay(1000);
   }
   dunkel();
-  pixels.show();
+  showLimited();
 }
 
 void handleApiTime() {
