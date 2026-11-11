@@ -125,7 +125,7 @@ SET_LOOP_TASK_STACK_SIZE(24 * 1024);
 // ###########################################################################################################################################
 // # Version number of the code:
 // ###########################################################################################################################################
-const char* WORD_CLOCK_VERSION = "V6.1.0.10";  // [V6 CHANGE 1] was "V6.1.0.5" - ONE firmware for the standard and the big panel (web page: System > Layout). Older notes: [V5 CHANGE 4] was "V6.1.0.4" - emojis, Christmas / New Year greetings, Play tab (games). Older notes: [V4 CHANGE 5] was "V6.1.0.3" - date separator setting. Older notes:  // [V3 CHANGE 4] was "V6.1.0.2" - must be exactly the GitHub release tag. V6.1.0.3 = fix: temperature / humidity / date timers (see V3 CHANGE 1-3).
+const char* WORD_CLOCK_VERSION = "V6.2.0.1";  // [V6 CHANGE 1] was "V6.1.0.5" - ONE firmware for the standard and the big panel (web page: System > Layout). Older notes: [V5 CHANGE 4] was "V6.1.0.4" - emojis, Christmas / New Year greetings, Play tab (games). Older notes: [V4 CHANGE 5] was "V6.1.0.3" - date separator setting. Older notes:  // [V3 CHANGE 4] was "V6.1.0.2" - must be exactly the GitHub release tag. V6.1.0.3 = fix: temperature / humidity / date timers (see V3 CHANGE 1-3).
 // [FORK] previous note:  // [FORK] the release tag on GitHub must be exactly this text
 
 
@@ -4726,6 +4726,9 @@ String resolveDownloadUrl(String url) {
     {
       WiFiClientSecure c;
       c.setInsecure();
+#if !defined(ESP32)
+      c.setBufferSizes(8192, 512);  // [V10 FIX] ESP8266: default BearSSL buffers need ~33 KB -> "last failed alloc" + reboot
+#endif
       HTTPClient http;
       http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
       http.setTimeout(10000);
@@ -4765,6 +4768,9 @@ void installRelease(const String& tag) {  // Download and install the update fil
   }
   WiFiClientSecure client;
   client.setInsecure();
+#if !defined(ESP32)
+  client.setBufferSizes(16709, 512);  // [V10 FIX] ESP8266: the download needs a full TLS record (16709) for input, but only 512 for output
+#endif
   ESPhttpUpdate.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);  // already resolved above
   ESPhttpUpdate.onStart(update_started);
   ESPhttpUpdate.onEnd(update_finished);
@@ -4794,7 +4800,7 @@ bool readhttpfile(String& errorMessage) {
 #if defined(ESP32)
   bool enoughMemory = ESP.getMaxAllocHeap() > 40000;
 #else
-  bool enoughMemory = ESP.getMaxFreeBlockSize() > 24000;  // The HTTPS connection needs about 22 KB in one block
+  bool enoughMemory = ESP.getMaxFreeBlockSize() > 16000;  // [V10 FIX] with the small buffers about 12-14 KB in one block are enough
 #endif
   if (!enoughMemory) {
     errorMessage = "memory";
@@ -4804,6 +4810,9 @@ bool readhttpfile(String& errorMessage) {
   errorMessage = "github";
   WiFiClientSecure wifiClient;
   wifiClient.setInsecure();  // No certificate check (the update server used before was plain HTTP)
+#if !defined(ESP32)
+  wifiClient.setBufferSizes(8192, 512);  // [V10 FIX] ESP8266: small buffers, otherwise out of memory -> reboot
+#endif
   HTTPClient http;
   http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
   http.setTimeout(10000);
