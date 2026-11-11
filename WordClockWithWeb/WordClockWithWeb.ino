@@ -125,7 +125,7 @@ SET_LOOP_TASK_STACK_SIZE(24 * 1024);
 // ###########################################################################################################################################
 // # Version number of the code:
 // ###########################################################################################################################################
-const char* WORD_CLOCK_VERSION = "V6.2.0.1";  // [V6 CHANGE 1] was "V6.1.0.5" - ONE firmware for the standard and the big panel (web page: System > Layout). Older notes: [V5 CHANGE 4] was "V6.1.0.4" - emojis, Christmas / New Year greetings, Play tab (games). Older notes: [V4 CHANGE 5] was "V6.1.0.3" - date separator setting. Older notes:  // [V3 CHANGE 4] was "V6.1.0.2" - must be exactly the GitHub release tag. V6.1.0.3 = fix: temperature / humidity / date timers (see V3 CHANGE 1-3).
+const char* WORD_CLOCK_VERSION = "V6.2.0.2";  // [V6 CHANGE 1] was "V6.1.0.5" - ONE firmware for the standard and the big panel (web page: System > Layout). Older notes: [V5 CHANGE 4] was "V6.1.0.4" - emojis, Christmas / New Year greetings, Play tab (games). Older notes: [V4 CHANGE 5] was "V6.1.0.3" - date separator setting. Older notes:  // [V3 CHANGE 4] was "V6.1.0.2" - must be exactly the GitHub release tag. V6.1.0.3 = fix: temperature / humidity / date timers (see V3 CHANGE 1-3).
 // [FORK] previous note:  // [FORK] the release tag on GitHub must be exactly this text
 
 
@@ -4769,7 +4769,21 @@ void installRelease(const String& tag) {  // Download and install the update fil
   WiFiClientSecure client;
   client.setInsecure();
 #if !defined(ESP32)
-  client.setBufferSizes(16709, 512);  // [V10 FIX] ESP8266: the download needs a full TLS record (16709) for input, but only 512 for output
+  {  // [V10 FIX 2] ESP8266: only ~19 KB of heap are free, a full TLS input buffer (16709) does not fit -> error -1.
+    // If the download server supports "max fragment length", the input buffer can be 4096 bytes. If not, fall back to the full size.
+    String host = finalUrl.substring(8);  // after "https://"
+    int slash = host.indexOf('/');
+    if (slash > 0) host = host.substring(0, slash);
+    bool mfln = false;
+    {
+      BearSSL::WiFiClientSecure probe;
+      probe.setInsecure();
+      mfln = probe.probeMaxFragmentLength(host, 443, 4096);
+    }
+    Serial.printf("Update: server %s supports small TLS buffers: %s (free heap %u, largest block %u)\n", host.c_str(), mfln ? "yes" : "no", ESP.getFreeHeap(), (unsigned)ESP.getMaxFreeBlockSize());
+    if (mfln) client.setBufferSizes(4096, 512);
+    else client.setBufferSizes(16709, 512);
+  }
 #endif
   ESPhttpUpdate.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);  // already resolved above
   ESPhttpUpdate.onStart(update_started);
