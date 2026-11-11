@@ -645,6 +645,7 @@ void setup() {
   pixels.setPin(hw.ledPin);         // LED pin from the configuration page
   pixels.begin();                   // Init the NeoPixel library
   dunkel();                         // Switch display black
+  bootUpdateCheck();                // [V10 FIX 3] pending automatic update: install it now, while enough memory is free
   if (!useCustomMinuteOrder) setDefaultMinuteLedOrderFromSwitch();    // Set default minute corner LED order based on switchLEDOrder setting
   pixels.setBrightness(intensity);  // Set LED brightness
 #if defined(ESP32)
@@ -4726,6 +4727,9 @@ String resolveDownloadUrl(String url) {
     {
       WiFiClientSecure c;
       c.setInsecure();
+#if !defined(ESP32)
+      c.setBufferSizes(8192, 512);  // [V10 FIX] ESP8266: default BearSSL buffers need ~33 KB -> "last failed alloc" + reboot
+#endif
       HTTPClient http;
       http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
       http.setTimeout(10000);
@@ -4752,7 +4756,7 @@ String resolveDownloadUrl(String url) {
   return "";
 }
 
-void installRelease(const String& tag) {  // Download and install the update file of the release
+void installReleaseNow(const String& tag) {  // Download and install the update file of the release (called with as much free memory as possible)
   Serial.println("Update: installing release " + tag + " (" UPDATE_BIN_NAME ")");
   String url = "https://github.com/" UPDATE_REPO "/releases/download/" + tag + "/" UPDATE_BIN_NAME;
   String finalUrl = resolveDownloadUrl(url);
@@ -4765,6 +4769,9 @@ void installRelease(const String& tag) {  // Download and install the update fil
   }
   WiFiClientSecure client;
   client.setInsecure();
+#if !defined(ESP32)
+  client.setBufferSizes(16709, 512);  // [V10 FIX] ESP8266: full TLS input record (the server does not support smaller ones), small output buffer
+#endif
   ESPhttpUpdate.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);  // already resolved above
   ESPhttpUpdate.onStart(update_started);
   ESPhttpUpdate.onEnd(update_finished);
@@ -4786,6 +4793,57 @@ void installRelease(const String& tag) {  // Download and install the update fil
 }
 
 
+// [V10 FIX 3] ESP8266: during normal operation only ~27 KB of heap are free, not enough for the TLS download (error -1).
+// So the update is done right after a restart: the version is remembered in the RTC memory (survives the restart), the clock restarts,
+// and bootUpdateCheck() (called early in setup(), before the web server etc. are started) connects to the WiFi and installs it.
+struct PendingUpdate {
+  uint32_t magic;
+  char tag[24];
+};
+const uint32_t PENDING_UPDATE_MAGIC = 0x57435550;  // "WCUP"
+
+void installRelease(const String& tag) {
+#if defined(ESP32)
+  installReleaseNow(tag);
+#else
+  PendingUpdate pu;
+  pu.magic = PENDING_UPDATE_MAGIC;
+  memset(pu.tag, 0, sizeof(pu.tag));
+  strlcpy(pu.tag, tag.c_str(), sizeof(pu.tag));
+  ESP.rtcUserMemoryWrite(0, (uint32_t*)&pu, sizeof(pu));
+  Serial.println("Update: restarting to install " + tag + " with free memory...");
+  delay(500);
+  ESP.restart();
+#endif
+}
+
+void bootUpdateCheck() {  // called from setup() right after the LEDs are initialised
+#if !defined(ESP32)
+  PendingUpdate pu;
+  if (!ESP.rtcUserMemoryRead(0, (uint32_t*)&pu, sizeof(pu))) return;
+  if (pu.magic != PENDING_UPDATE_MAGIC) return;
+  pu.magic = 0;  // clear first, so a failed update can never end in a restart loop
+  ESP.rtcUserMemoryWrite(0, (uint32_t*)&pu, sizeof(pu));
+  pu.tag[sizeof(pu.tag) - 1] = 0;
+  String tag = String(pu.tag);
+  Serial.println("Update: boot update of " + tag + ", connecting to the WiFi...");
+  WiFi.mode(WIFI_STA);
+  WiFi.begin();  // saved WiFi credentials
+  unsigned long t0 = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - t0 < 20000) {
+    delay(250);
+    ESP_WDT_FEED();
+  }
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("Update: no WiFi, update cancelled");
+    return;
+  }
+  Serial.printf("Update: WiFi connected, free heap %u, largest block %u\n", ESP.getFreeHeap(), (unsigned)ESP.getMaxFreeBlockSize());
+  installReleaseNow(tag);
+#endif
+}
+
+
 // ###########################################################################################################################################
 // # Check for available updates:
 // ###########################################################################################################################################
@@ -4794,7 +4852,7 @@ bool readhttpfile(String& errorMessage) {
 #if defined(ESP32)
   bool enoughMemory = ESP.getMaxAllocHeap() > 40000;
 #else
-  bool enoughMemory = ESP.getMaxFreeBlockSize() > 24000;  // The HTTPS connection needs about 22 KB in one block
+  bool enoughMemory = ESP.getMaxFreeBlockSize() > 16000;  // [V10 FIX] with the small buffers about 12-14 KB in one block are enough
 #endif
   if (!enoughMemory) {
     errorMessage = "memory";
@@ -4804,6 +4862,9 @@ bool readhttpfile(String& errorMessage) {
   errorMessage = "github";
   WiFiClientSecure wifiClient;
   wifiClient.setInsecure();  // No certificate check (the update server used before was plain HTTP)
+#if !defined(ESP32)
+  wifiClient.setBufferSizes(8192, 512);  // [V10 FIX] ESP8266: small buffers, otherwise out of memory -> reboot
+#endif
   HTTPClient http;
   http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
   http.setTimeout(10000);
