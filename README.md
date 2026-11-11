@@ -8,7 +8,7 @@ Feel free to add functions, ideas and everything else, which helps this project 
 <hr>
 
 
-<h3><b>Current version: V6.1.0.8     </b></h3>
+<h3><b>Current version: V6.1.0.9     </b></h3>
 
 
 <hr>
@@ -189,6 +189,7 @@ Install these libraries in the Arduino IDE library manager (the ESP8266Ping libr
            Web interface: preview with the letters of the front plate, current color in the random color mode.
            Library change for compiling: ESPping (works on ESP8266 and ESP32) replaces ESP8266Ping, ArduinoJson 7 is needed.
 - 6.1.0.5  Emojis (12 built-in + 4 drawn on the web page), Christmas / New Year greetings in DE/ES/EN, new tab "Play" with 6 games shown live on the clock.
+- 6.1.0.9  Fix of the automatic update (error -104): the GitHub download redirect is followed by hand.
 - 6.1.0.8  Digits 0-9 and symbols in all scrolling texts, notification text (name / number) switchable per type, emoji import in the web editor (type / paste an emoji or load an image).
 - 6.1.0.7  Security (password for web page / API / REST, host + origin check, hotspot password, local update page only with password), timer + pomodoro, birthdays / special dates, ambient modes (fire, aurora, breathing, sun), notification icons for MacroDroid (/api/notify, /api/timer). All in the new web tab "Extras".
 - 6.1.0.6  ONE firmware for the standard and the big panel: choose the layout in the web page (System > Layout, with row mirror and current limit). The Christmas / New Year greetings are now ON by default and live in the tab "Lauftexte".

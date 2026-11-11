@@ -10,6 +10,8 @@
 // ###########################################################################################################################################
 // # [FORK] Layout version (10 x 11 panel) with the improvements of the fork V6.1.0.2 merged in. Own version numbers have 4 parts
 // #   (V6.1.0.1, V6.1.0.2, ...), see parseVersion() / compareVersions(). Update source: UPDATE_REPO in settings.h.
+// # [FORK] V6.1.0.9: FIX of the automatic update (error -104): the GitHub download redirect is now followed by hand in resolveDownloadUrl(),
+// #   the HTTP code of every hop is printed on the serial monitor. Nothing else changed.
 // # [FORK] V6.1.0.8 (marked "[V8 CHANGE n]"):
 // #   1. The scrolling texts (birthdays, notifications, boot texts) now also show digits 0-9 and the symbols . , : ! ? - + / ( ) & # @ ' (getGlyph()).
 // #   2. Notification texts (name / number of the caller or sender) can be switched off per type (WhatsApp, call, SMS, mail, Telegram, bell): tab "Extras".
@@ -123,7 +125,7 @@ SET_LOOP_TASK_STACK_SIZE(24 * 1024);
 // ###########################################################################################################################################
 // # Version number of the code:
 // ###########################################################################################################################################
-const char* WORD_CLOCK_VERSION = "V6.1.0.8";  // [V6 CHANGE 1] was "V6.1.0.5" - ONE firmware for the standard and the big panel (web page: System > Layout). Older notes: [V5 CHANGE 4] was "V6.1.0.4" - emojis, Christmas / New Year greetings, Play tab (games). Older notes: [V4 CHANGE 5] was "V6.1.0.3" - date separator setting. Older notes:  // [V3 CHANGE 4] was "V6.1.0.2" - must be exactly the GitHub release tag. V6.1.0.3 = fix: temperature / humidity / date timers (see V3 CHANGE 1-3).
+const char* WORD_CLOCK_VERSION = "V6.1.0.9";  // [V6 CHANGE 1] was "V6.1.0.5" - ONE firmware for the standard and the big panel (web page: System > Layout). Older notes: [V5 CHANGE 4] was "V6.1.0.4" - emojis, Christmas / New Year greetings, Play tab (games). Older notes: [V4 CHANGE 5] was "V6.1.0.3" - date separator setting. Older notes:  // [V3 CHANGE 4] was "V6.1.0.2" - must be exactly the GitHub release tag. V6.1.0.3 = fix: temperature / humidity / date timers (see V3 CHANGE 1-3).
 // [FORK] previous note:  // [FORK] the release tag on GitHub must be exactly this text
 
 
@@ -4595,17 +4597,60 @@ int compareVersions(const String& a, const String& b) {  // > 0 if a is newer th
   return 0;
 }
 
+// [V8 FIX] GitHub redirects the download to its file server. The redirects are followed here by hand (a fresh TLS connection per hop,
+// the HTTP code of every hop is printed), because the automatic redirect of the update library ended with error -104 (unexpected HTTP code).
+String resolveDownloadUrl(String url) {
+  for (int hop = 0; hop < 5; hop++) {
+    String loc;
+    int code = 0;
+    {
+      WiFiClientSecure c;
+      c.setInsecure();
+      HTTPClient http;
+      http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+      http.setTimeout(10000);
+      if (!http.begin(c, url)) return "";
+      const char* hk[] = { "Location" };
+      http.collectHeaders(hk, 1);
+      code = http.GET();
+      loc = http.header("Location");
+      http.end();
+    }
+    Serial.printf("Update: hop %d -> HTTP %d (free heap %u, largest block %u)\n", hop, code, ESP.getFreeHeap(), (unsigned)
+#if defined(ESP32)
+                  ESP.getMaxAllocHeap()
+#else
+                  ESP.getMaxFreeBlockSize()
+#endif
+    );
+    if ((code == 301 || code == 302 || code == 303 || code == 307 || code == 308) && loc.length()) {
+      url = loc;
+      continue;
+    }
+    return (code == 200) ? url : String("");
+  }
+  return "";
+}
+
 void installRelease(const String& tag) {  // Download and install the update file of the release
   Serial.println("Update: installing release " + tag + " (" UPDATE_BIN_NAME ")");
+  String url = "https://github.com/" UPDATE_REPO "/releases/download/" + tag + "/" UPDATE_BIN_NAME;
+  String finalUrl = resolveDownloadUrl(url);
+  if (!finalUrl.length()) {
+    Serial.println("Update: the download address could not be resolved");
+    update_error(-1);
+    delay(3000);
+    ESP.restart();
+    return;
+  }
   WiFiClientSecure client;
   client.setInsecure();
-  ESPhttpUpdate.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);  // GitHub redirects downloads to its file server
+  ESPhttpUpdate.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);  // already resolved above
   ESPhttpUpdate.onStart(update_started);
   ESPhttpUpdate.onEnd(update_finished);
   ESPhttpUpdate.onProgress(update_progress);
   ESPhttpUpdate.onError(update_error);
-  String url = "https://github.com/" UPDATE_REPO "/releases/download/" + tag + "/" UPDATE_BIN_NAME;
-  t_httpUpdate_return ret = ESPhttpUpdate.update(client, url);
+  t_httpUpdate_return ret = ESPhttpUpdate.update(client, finalUrl);
   switch (ret) {
     case HTTP_UPDATE_FAILED:
       Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
