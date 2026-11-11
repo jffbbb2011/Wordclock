@@ -381,12 +381,13 @@ struct xtRec {
   char pass[33];     // password of the web page / API / update page (user "admin"), empty = no protection
   char apPass[33];   // password of the "WordClock" setup hotspot (min. 8 characters), empty = open hotspot
   char token[17];    // API key for MacroDroid (/api/notify, /api/timer)
-  uint8_t ambMode;   // 0 = off, 1 = fire, 2 = aurora, 3 = breathing, 4 = sun (warm / dim at night)
+  uint8_t ambMode;   // 0 = off, 1 = fire, 2 = aurora, 3 = breathing, 4 = sun (warm / dim at night), 5 = ocean, 6 = candle, 7 = rainbow wave, 8 = sparkle, 9 = sunset
   uint8_t bdayOn;
   uint8_t bdayEvery; // repeat interval in units of 15 minutes
   uint8_t ntfOff;    // [V8] bit set = no text (name) for that notification type: 0 WhatsApp, 1 call, 2 SMS, 3 mail, 4 Telegram, 5 bell
   float lat, lon;
   bdayRec bday[16];
+  uint8_t pomoWork, pomoBrk, pomoLng, xtPad;  // [V9] pomodoro minutes: work / short break / long break (appended at the END, old records stay valid)
 } xt;
 #define XT_MAGIC 0x57435831UL  // "WCX1"
 #define XT_OFFSET (LAY_OFFSET + ((sizeof(layRec) + 3) / 4) * 4)
@@ -410,6 +411,9 @@ void xtDefaults() {
   xt.magic = XT_MAGIC;
   xt.bdayOn = 1;
   xt.bdayEvery = 2;  // every 30 minutes
+  xt.pomoWork = 25;
+  xt.pomoBrk = 5;
+  xt.pomoLng = 15;
   xtNewToken();
 }
 
@@ -907,11 +911,15 @@ void readEEPROM() {
 
   // [V7] Extras (password, API key, birthdays, ambient mode):
   EEPROM.get(XT_OFFSET, xt);
-  if (xt.magic != XT_MAGIC || xt.ambMode > 4 || xt.bdayEvery < 1 || xt.bdayEvery > 16) {
+  if (xt.magic != XT_MAGIC || xt.ambMode > 9 || xt.bdayEvery < 1 || xt.bdayEvery > 16) {
     xtDefaults();
     writeXtConfig();
   }
   xt.pass[32] = xt.apPass[32] = xt.token[16] = 0;
+  // [V9] pomodoro minutes were added later: an old record has garbage / 0 there -> use the defaults without touching the rest
+  if (xt.pomoWork < 1 || xt.pomoWork > 99) xt.pomoWork = 25;
+  if (xt.pomoBrk < 1 || xt.pomoBrk > 99) xt.pomoBrk = 5;
+  if (xt.pomoLng < 1 || xt.pomoLng > 99) xt.pomoLng = 15;
 }
 
 
@@ -1255,6 +1263,14 @@ void printAt(int ziffer, int x, int y) {
 // ###########################################################################################################################################
 // # Turns on the outer four LEDs (one per minute):
 // ###########################################################################################################################################
+// [V9] In the rainbow / random modes every corner LED gets its own colour (4 hues spread over the colour circle, new every minute).
+// The web page calculates the same hues (rbRandom(seed, 777)), so the preview shows the same corner colours.
+uint32_t cornerColor(int idx) {
+  if (switchRainBow == 0) return pixels.Color(redVal, greenVal, blueVal);
+  uint16_t hue = (uint16_t)((rainbowRandom(777) & 0xFFFF) + idx * 16384);
+  return pixels.gamma32(pixels.ColorHSV(hue));
+}
+
 void showMinutes(int minutes) {
   int minMod = (minutes % 5);
 
@@ -1267,7 +1283,7 @@ void showMinutes(int minutes) {
     if (minMod < i)
       setPx(ledNr, pixels.Color(0, 0, 0));
     else
-      setPx(ledNr, pixels.Color(redVal, greenVal, blueVal));
+      setPx(ledNr, cornerColor(i - 1));
   }
 }
 
@@ -2573,10 +2589,10 @@ void tmrFinished() {
   if (pomo == 1) {  // work finished -> break (every 4th time a long one)
     tmrCycle++;
     scrollMsg(tmrWord(2), false, pixels.Color(0, 200, 0), 75);
-    tmrStart((tmrCycle % 4 == 0) ? 15UL * 60 : 5UL * 60, 2);
+    tmrStart((tmrCycle % 4 == 0) ? xt.pomoLng * 60UL : xt.pomoBrk * 60UL, 2);  // [V9] minutes from the Extras tab
   } else {
     scrollMsg(tmrWord(1), false, pixels.Color(255, 90, 0), 75);
-    tmrStart(25UL * 60, 1);
+    tmrStart(xt.pomoWork * 60UL, 1);
   }
 }
 
@@ -2635,6 +2651,56 @@ void bdayTick() {
 }
 
 // ---- Ambient modes ----
+// [V9] Position for the "sun" mode: taken from the time zone set on the TIME tab (no latitude / longitude input any more).
+// Known presets of the web page use a city of that zone, any other POSIX time zone string is estimated from its UTC offset
+// (15 degrees of longitude per hour) and from the DST rule (months of the switch -> northern or southern hemisphere).
+struct TzPlace { const char* tz; float lat, lon; };
+static const TzPlace TZ_PLACES[] = {
+  { "CET-1CEST,M3.5.0/02,M10.5.0/03", 50.1f, 9.0f },    // Central Europe (Germany)
+  { "CET-1CEST,M3.5.0,M10.5.0/3", 40.4f, -3.7f },       // Spain (Madrid)
+  { "GMT0BST,M3.5.0/1,M10.5.0", 51.5f, -0.1f },         // London
+  { "WET0WEST,M3.5.0/1,M10.5.0", 38.7f, -9.1f },        // Lisbon
+  { "EET-2EEST,M3.5.0/3,M10.5.0/4", 50.0f, 25.0f },     // Eastern Europe
+  { "EST5EDT,M3.2.0,M11.1.0", 40.7f, -74.0f },          // New York
+  { "CST6CDT,M3.2.0,M11.1.0", 41.9f, -87.6f },          // Chicago
+  { "PST8PDT,M3.2.0,M11.1.0", 34.1f, -118.2f },         // Los Angeles
+};
+
+void tzPlace(float& lat, float& lon) {
+  static String cachedTz = "\x01";
+  static float la = 45.0f, lo = 0.0f;
+  if (cachedTz != timeZone) {
+    cachedTz = timeZone;
+    la = 45.0f;
+    lo = 0.0f;
+    bool found = false;
+    for (unsigned i = 0; i < sizeof(TZ_PLACES) / sizeof(TZ_PLACES[0]); i++)
+      if (timeZone == TZ_PLACES[i].tz) { la = TZ_PLACES[i].lat; lo = TZ_PLACES[i].lon; found = true; break; }
+    if (!found && timeZone.length()) {
+      const char* p = timeZone.c_str();
+      if (*p == '<') { while (*p && *p != '>') p++; if (*p) p++; }
+      else while (isalpha((unsigned char)*p)) p++;
+      int sign = 1;
+      if (*p == '-') { sign = -1; p++; } else if (*p == '+') p++;
+      float h = (float)atoi(p);
+      const char* c = p;
+      while (isdigit((unsigned char)*c)) c++;
+      if (*c == ':') h += atoi(c + 1) / 60.0f;
+      float utcOff = -sign * h;  // POSIX: "CET-1" = UTC+1
+      lo = constrain(utcOff * 15.0f, -180.0f, 180.0f);
+      la = 40.0f;
+      const char* m1 = strstr(timeZone.c_str(), ",M");
+      if (m1) {
+        const char* m2 = strstr(m1 + 2, ",M");
+        if (m2 && atoi(m1 + 2) > atoi(m2 + 2)) la = -34.0f;  // DST starts in autumn of the north = southern hemisphere
+        else la = 45.0f;
+      }
+    }
+  }
+  lat = la;
+  lon = lo;
+}
+
 // Sunrise / sunset in local minutes (NOAA approximation). return: 0 = normal, 1 = polar day, -1 = polar night.
 int sunTimes(float lat, float lon, int doy, int tzMin, float& rise, float& set) {
   float g = 2.0f * PI / 365.0f * doy;
@@ -2657,17 +2723,17 @@ float smoothStep(float a, float b, float v) {
 }
 
 float sunDayness() {  // 0 = night, 1 = day, smooth around sunrise / sunset
-  if (xt.lat == 0.0f && xt.lon == 0.0f) return 1.0f;
   time_t n = time(nullptr);
   struct tm lt, gt;
   localtime_r(&n, &lt);
   gmtime_r(&n, &gt);
   gt.tm_isdst = -1;
   int tz = (int)((long)n - (long)mktime(&gt)) / 60;
-  float rise = 0, set = 0;
-  int pol = sunTimes(xt.lat, xt.lon, lt.tm_yday, tz, rise, set);
+  float lat, lon, rise = 0, set = 0;
+  tzPlace(lat, lon);
+  int pol = sunTimes(lat, lon, lt.tm_yday, tz, rise, set);
   if (pol) return pol > 0 ? 1.0f : 0.0f;
-  float now = lt.tm_hour * 60.0f + lt.tm_min;
+  float now = lt.tm_hour * 60.0f + lt.tm_min + lt.tm_sec / 60.0f;
   return smoothStep(rise - 30, rise + 30, now) * (1.0f - smoothStep(set - 30, set + 30, now));
 }
 
@@ -2676,44 +2742,83 @@ void ambSnapshot() {
   ambReady = true;
 }
 
+// colour of a hue with the brightness l (0..255) -> r, g, b as float
+static void ambHsv(uint16_t hue, float l, float& r, float& g, float& bl) {
+  uint32_t c = pixels.ColorHSV(hue, 255, 255);
+  r = ((c >> 16) & 255) * l / 255.0f;
+  g = ((c >> 8) & 255) * l / 255.0f;
+  bl = (c & 255) * l / 255.0f;
+}
+
 // Called every ~5 ms from serviceDelay(): re-colours the lit LEDs of the last picture (buffer order of NEO_GRB: byte 0 = G, 1 = R, 2 = B).
+// All effects are calculated from millis(), so they run smoothly although the clock picture is rebuilt about every 2 seconds.
 void ambientTick() {
   if (!xt.ambMode || !ambReady || playActive || !LEDsON || !RESTmanLEDsON) return;
   unsigned long now = millis();
-  if (now - ambLastMs < (xt.ambMode == 4 ? 1000UL : 70UL)) return;
+  unsigned long gap = (xt.ambMode == 4) ? 500UL : (xt.ambMode == 3) ? 30UL : (xt.ambMode == 1 || xt.ambMode == 6) ? 70UL : 45UL;
+  if (now - ambLastMs < gap) return;
   ambLastMs = now;
   uint8_t* b = pixels.getPixels();
   float t = now / 1000.0f;
   float day = (xt.ambMode == 4) ? sunDayness() : 1.0f;
-  float breath = 0.35f + 0.65f * (0.5f + 0.5f * sinf(t * 2.0f * PI / 6.0f));
+  float k3 = 0.5f - 0.5f * cosf(t * 2.0f * PI / 7.0f);  // breathing: 7 s, deep (3 % .. 100 %) and with a gamma curve so the eye sees it
+  k3 = 0.03f + 0.97f * k3 * k3;
   for (int i = 0; i < NUMPIXELS; i++) {
     uint8_t g0 = ambBase[i * 3], r0 = ambBase[i * 3 + 1], b0 = ambBase[i * 3 + 2];
     uint8_t l = max(max(g0, r0), b0);
     if (!l) continue;
     float r = r0, g = g0, bl = b0;
-    if (xt.ambMode == 1) {  // fire
-      ambNoise[i] += ((int)random(90, 256) - (int)ambNoise[i]) / 3;
-      float f = ambNoise[i] / 255.0f;
-      r = l * f;
-      g = l * f * f * 0.45f;
-      bl = 0;
-    } else if (xt.ambMode == 2) {  // aurora: green -> turquoise -> violet waves
-      float hue = 36000.0f + 14000.0f * sinf(t / 4.0f + (i % 11) * 0.45f + (i / 11) * 0.3f);
-      uint32_t c = pixels.ColorHSV((uint16_t)hue, 255, 255);
-      r = ((c >> 16) & 255) * l / 255.0f;
-      g = ((c >> 8) & 255) * l / 255.0f;
-      bl = (c & 255) * l / 255.0f;
-    } else if (xt.ambMode == 3) {  // breathing
-      r *= breath; g *= breath; bl *= breath;
-    } else if (xt.ambMode == 4) {  // sun: warm and dim at night, the chosen colour by day
-      float k = 0.35f + 0.65f * day;
-      r *= k;
-      g *= k * (0.45f + 0.55f * day);
-      bl *= k * (0.15f + 0.85f * day);
+    int row = i / 11;  // matrix: row 0 = bottom, serpentine; corners get fixed places
+    float y = (i < 110) ? (float)row : 0.0f;
+    float x = (i < 110) ? (float)((row % 2) ? 10 - (i % 11) : (i % 11)) : (float)((i - 110) * 3);
+    switch (xt.ambMode) {
+      case 1:  // fire
+        ambNoise[i] += ((int)random(90, 256) - (int)ambNoise[i]) / 3;
+        {
+          float f = ambNoise[i] / 255.0f;
+          r = l * f; g = l * f * f * 0.45f; bl = 0;
+        }
+        break;
+      case 2:  // aurora: green -> turquoise -> violet waves
+        ambHsv((uint16_t)(36000.0f + 14000.0f * sinf(t / 4.0f + x * 0.45f + y * 0.3f)), l, r, g, bl);
+        break;
+      case 3:  // breathing: the chosen colour fades in and out
+        r *= k3; g *= k3; bl *= k3;
+        break;
+      case 4: {  // sun: warm and dim at night, the chosen colour by day
+        float k = 0.35f + 0.65f * day;
+        r *= k; g *= k * (0.45f + 0.55f * day); bl *= k * (0.15f + 0.85f * day);
+        break;
+      }
+      case 5: {  // ocean: blue / turquoise waves with moving brightness
+        ambHsv((uint16_t)(36000.0f + 8500.0f * sinf(t / 3.0f + x * 0.5f + y * 0.35f)), l * (0.55f + 0.45f * sinf(t * 1.1f + x * 0.6f - y * 0.5f)), r, g, bl);
+        break;
+      }
+      case 6: {  // candle: soft warm flicker
+        ambNoise[i] += ((int)random(150, 256) - (int)ambNoise[i]) / 5;
+        float f = ambNoise[i] / 255.0f;
+        r = l * f; g = l * f * 0.62f; bl = l * f * 0.10f;
+        break;
+      }
+      case 7:  // rainbow wave flowing over the clock
+        ambHsv((uint16_t)((long)(t * 4500.0f + x * 3600.0f + y * 1700.0f) & 0xFFFF), l, r, g, bl);
+        break;
+      case 8: {  // sparkle: the chosen colour with random white twinkles
+        if (random(1000) < 12) ambNoise[i] = 255;
+        else ambNoise[i] = (uint8_t)(ambNoise[i] * 0.88f);
+        float s = ambNoise[i] / 255.0f;
+        r += (l - r) * s; g += (l - g) * s; bl += (l - bl) * s;
+        break;
+      }
+      case 9: {  // sunset: orange at the bottom -> pink -> violet at the top, drifting slowly
+        float pp = y / 9.0f + 0.12f * sinf(t / 6.0f + x * 0.1f);
+        ambHsv((uint16_t)((long)(3000.0f - pp * 18500.0f) & 0xFFFF), l, r, g, bl);
+        break;
+      }
     }
-    b[i * 3] = (uint8_t)min(g, 255.0f);
-    b[i * 3 + 1] = (uint8_t)min(r, 255.0f);
-    b[i * 3 + 2] = (uint8_t)min(bl, 255.0f);
+    b[i * 3] = (uint8_t)min(max(g, 0.0f), 255.0f);
+    b[i * 3 + 1] = (uint8_t)min(max(r, 0.0f), 255.0f);
+    b[i * 3 + 2] = (uint8_t)min(max(bl, 0.0f), 255.0f);
   }
   showLimited();
 }
@@ -2798,20 +2903,7 @@ bool restOk() {  // REST server on port 55555: only protected once a password is
 // #   GET/POST /api/notify?key=KEY&type=whatsapp|call|sms|mail|telegram|bell&text=NAME   shows an icon (+ text); type=clear ends a call
 // #   GET/POST /api/timer?key=KEY&min=10 | sec=90 | pomo=1 | cmd=stop
 // ###########################################################################################################################################
-void handleApiExtrasGet() {
-  JsonDocument d;
-  d["ok"] = true;
-  d["hasPass"] = xt.pass[0] != 0;
-  d["hasApPass"] = xt.apPass[0] != 0;
-  d["token"] = (const char*)xt.token;
-  d["amb"] = xt.ambMode;
-  d["lat"] = xt.lat;
-  d["lon"] = xt.lon;
-  d["bdayOn"] = xt.bdayOn;
-  d["bdayEvery"] = xt.bdayEvery * 15;
-  d["ntfOff"] = xt.ntfOff;
-  d["tmr"] = tmrActive ? (int)max(0L, (long)(tmrEnd - millis()) / 1000L) : 0;
-  JsonArray a = d["bday"].to<JsonArray>();
+void bdayToJson(JsonArray a) {
   for (int i = 0; i < 16; i++) {
     if (!xt.bday[i].used) continue;
     JsonObject o = a.add<JsonObject>();
@@ -2820,6 +2912,23 @@ void handleApiExtrasGet() {
     o["k"] = xt.bday[i].kind;
     o["n"] = (const char*)xt.bday[i].name;
   }
+}
+
+void handleApiExtrasGet() {
+  JsonDocument d;
+  d["ok"] = true;
+  d["hasPass"] = xt.pass[0] != 0;
+  d["hasApPass"] = xt.apPass[0] != 0;
+  d["token"] = (const char*)xt.token;
+  d["amb"] = xt.ambMode;
+  d["bdayOn"] = xt.bdayOn;
+  d["bdayEvery"] = xt.bdayEvery * 15;
+  d["ntfOff"] = xt.ntfOff;
+  d["tmr"] = tmrActive ? (int)max(0L, (long)(tmrEnd - millis()) / 1000L) : 0;
+  d["pomo"]["work"] = xt.pomoWork;
+  d["pomo"]["brk"] = xt.pomoBrk;
+  d["pomo"]["lng"] = xt.pomoLng;
+  bdayToJson(d["bday"].to<JsonArray>());
   sendJson(200, d);
 }
 
@@ -2827,6 +2936,7 @@ void handleApiExtrasPost() {
   JsonDocument d;
   if (deserializeJson(d, server.arg("plain"))) return sendError(400, "invalid JSON");
   bool restart = false;
+  int bdayCount = -1;
   if (!d["pass"].isNull()) {
     String p = d["pass"] | "";
     if (p.length() > 32) return sendError(400, "pass");
@@ -2849,12 +2959,15 @@ void handleApiExtrasPost() {
   if (!d["ntfOff"].isNull()) xt.ntfOff = (uint8_t)((int)(d["ntfOff"] | 0) & 63);  // [V8]
   if (!d["amb"].isNull()) {
     int m = d["amb"] | 0;
-    if (m < 0 || m > 4) return sendError(400, "amb");
-    xt.ambMode = m;
-    xt.lat = d["lat"] | xt.lat;
-    xt.lon = d["lon"] | xt.lon;
-    if (xt.lat < -90 || xt.lat > 90 || xt.lon < -180 || xt.lon > 180) return sendError(400, "coords");
+    if (m < 0 || m > 9) return sendError(400, "amb");
+    xt.ambMode = m;  // [V9] the sun mode takes its position from the time zone, no coordinates any more
     ambReady = false;
+  }
+  if (!d["pomo"].isNull()) {  // [V9] pomodoro minutes
+    JsonObject po = d["pomo"];
+    xt.pomoWork = (uint8_t)constrain((int)(po["work"] | 25), 1, 99);
+    xt.pomoBrk = (uint8_t)constrain((int)(po["brk"] | 5), 1, 99);
+    xt.pomoLng = (uint8_t)constrain((int)(po["lng"] | 15), 1, 99);
   }
   if (!d["bday"].isNull()) {
     JsonObject b = d["bday"];
@@ -2875,13 +2988,20 @@ void handleApiExtrasPost() {
       xt.bday[n].m = mm;
       xt.bday[n].kind = (o["k"] | 0) ? 1 : 0;
       strncpy(xt.bday[n].name, nm.c_str(), 12);
+      xt.bday[n].name[12] = 0;
       n++;
     }
+    bdayCount = n;
+    Serial.println("Birthdays saved: " + String(n) + " of " + String(a.size()) + " received");
   }
   writeXtConfig();
   JsonDocument res;
   res["ok"] = true;
   res["restart"] = restart;
+  if (bdayCount >= 0) {  // [V9] the page shows exactly what the clock has stored
+    res["n"] = bdayCount;
+    bdayToJson(res["bday"].to<JsonArray>());
+  }
   sendJson(200, res);
   if (restart) {
     delay(300);
@@ -2935,7 +3055,7 @@ void handleApiTimer() {
   }
   if (pomo) {
     tmrCycle = 0;
-    tmrStart(25UL * 60, 1);
+    tmrStart(xt.pomoWork * 60UL, 1);
   } else if (sec >= 1 && sec <= 5940) {
     tmrStart(sec, 0);
   } else {

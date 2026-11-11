@@ -735,7 +735,13 @@ canvas.playcv{cursor:pointer}
               <input type="number" id="xTmrMin" min="1" max="99" value="10" style="width:5em">
               <button type="button" class="btn sm primary" id="xTmrGo" data-t="tmrStart"></button>
               <button type="button" class="btn sm" id="xTmrPomo" data-t="tmrPomo"></button>
-              <button type="button" class="btn sm danger" id="xTmrStop" data-t="tmrStop"></button></span></div></div>
+              <button type="button" class="btn sm danger" id="xTmrStop" data-t="tmrStop"></button></span></div>
+              <div class="row"><span class="rt"><b data-t="pomoCfg"></b><small data-t="pomoCfgSub"></small></span><span class="inline">
+                <input type="number" id="xPomoWork" min="1" max="99" value="25" style="width:4.2em" aria-label="work">
+                <input type="number" id="xPomoBrk" min="1" max="99" value="5" style="width:4.2em" aria-label="break">
+                <input type="number" id="xPomoLng" min="1" max="99" value="15" style="width:4.2em" aria-label="long break">
+                <button type="button" class="btn sm primary" id="xPomoSave" data-t="xSave"></button></span></div></div>
+            <p class="hint" data-t="tmrHint"></p>
           </div>
           <div class="group">
             <h3 data-t="gBday"></h3>
@@ -751,9 +757,7 @@ canvas.playcv{cursor:pointer}
             <h3 data-t="gAmb"></h3>
             <p class="hint" data-t="ambHint"></p>
             <div class="rows">
-              <div class="row"><span class="rt"><b data-t="gAmb"></b></span><select id="xAmb"><option value="0" data-t="amb0"></option><option value="1" data-t="amb1"></option><option value="2" data-t="amb2"></option><option value="3" data-t="amb3"></option><option value="4" data-t="amb4"></option></select></div>
-              <div class="row"><span class="rt"><b data-t="ambLat"></b></span><input type="number" id="xLat" step="0.0001" min="-90" max="90" style="width:9em"></div>
-              <div class="row"><span class="rt"><b data-t="ambLon"></b></span><input type="number" id="xLon" step="0.0001" min="-180" max="180" style="width:9em"></div>
+              <div class="row"><span class="rt"><b data-t="gAmb"></b></span><select id="xAmb"><option value="0" data-t="amb0"></option><option value="1" data-t="amb1"></option><option value="2" data-t="amb2"></option><option value="3" data-t="amb3"></option><option value="4" data-t="amb4"></option><option value="5" data-t="amb5"></option><option value="6" data-t="amb6"></option><option value="7" data-t="amb7"></option><option value="8" data-t="amb8"></option><option value="9" data-t="amb9"></option></select></div>
             </div>
             <div class="btnrow"><button type="button" class="btn sm primary" id="xAmbSave" data-t="xSave"></button></div>
           </div>
@@ -877,12 +881,22 @@ const T = {
     bdayK1: "Termin (nur Text)",
     bdayTest: "Test",
     gAmb: "Ambiente-Modus",
-    ambHint: "Ersetzt die Wortfarbe. „Sonne“ braucht Breiten- und Längengrad (Sonnenauf-/untergang wird berechnet, ohne Internet).",
+    ambHint: "Ersetzt die Wortfarbe. „Sonne“ berechnet Sonnenauf-/untergang aus der Zeitzone (Tab Zeit), ohne Internet.",
     amb0: "Aus",
     amb1: "Feuer",
     amb2: "Aurora",
     amb3: "Atmen",
     amb4: "Sonne (nachts warm & dunkel)",
+    amb5: "Ozean",
+    amb6: "Kerze",
+    amb7: "Regenbogen-Welle",
+    amb8: "Funkeln",
+    amb9: "Sonnenuntergang",
+    pomoCfg: "Pomodoro-Zeiten",
+    pomoCfgSub: "Arbeit / Pause / lange Pause (Min.)",
+    tmrHint: "Timer: Minuten eingeben und Start, die Uhr zeigt Minuten (oben) und Sekunden (unten), die 4 Ecken zeigen den Fortschritt. Pomodoro: Arbeit → Pause, nach jeder 4. Arbeitsphase eine lange Pause, bis „Stopp“.",
+    bdayBlank: "Einträge ohne Namen wurden nicht gespeichert.",
+    bdayMismatch: "Die Uhr hat nur {n} Einträge gespeichert.",
     ambLat: "Breitengrad",
     ambLon: "Längengrad",
     gNtf: "Benachrichtigungen (MacroDroid)",
@@ -1094,12 +1108,22 @@ const T = {
     bdayK1: "Date (text only)",
     bdayTest: "Test",
     gAmb: "Ambient mode",
-    ambHint: "Replaces the word colour. “Sun” needs latitude and longitude (sunrise / sunset are calculated, no internet).",
+    ambHint: "Replaces the word colour. “Sun” calculates sunrise / sunset from the time zone (Time tab), no internet needed.",
     amb0: "Off",
     amb1: "Fire",
     amb2: "Aurora",
     amb3: "Breathing",
     amb4: "Sun (warm & dim at night)",
+    amb5: "Ocean",
+    amb6: "Candle",
+    amb7: "Rainbow wave",
+    amb8: "Sparkle",
+    amb9: "Sunset",
+    pomoCfg: "Pomodoro times",
+    pomoCfgSub: "work / break / long break (min.)",
+    tmrHint: "Timer: enter minutes and press Start. The clock shows minutes (top) and seconds (bottom), the 4 corners show the progress. Pomodoro: work → break, a long break after every 4th work phase, until “Stop”.",
+    bdayBlank: "Entries without a name were not saved.",
+    bdayMismatch: "The clock stored only {n} entries.",
     ambLat: "Latitude",
     ambLon: "Longitude",
     gNtf: "Notifications (MacroDroid)",
@@ -1311,12 +1335,22 @@ const T = {
     bdayK1: "Fecha (solo texto)",
     bdayTest: "Probar",
     gAmb: "Modo ambiente",
-    ambHint: "Sustituye el color de las palabras. «Sol» necesita latitud y longitud (el amanecer y el atardecer se calculan, sin internet).",
+    ambHint: "Sustituye el color de las palabras. «Sol» calcula el amanecer y el atardecer a partir de la zona horaria (pestaña Hora), sin internet.",
     amb0: "Desactivado",
     amb1: "Fuego",
     amb2: "Aurora",
     amb3: "Respiración",
     amb4: "Sol (cálido y tenue de noche)",
+    amb5: "Océano",
+    amb6: "Vela",
+    amb7: "Ola arcoíris",
+    amb8: "Destellos",
+    amb9: "Atardecer",
+    pomoCfg: "Tiempos del Pomodoro",
+    pomoCfgSub: "trabajo / descanso / descanso largo (min.)",
+    tmrHint: "Temporizador: pon los minutos y pulsa Iniciar. El reloj muestra los minutos (arriba) y los segundos (abajo); las 4 esquinas muestran el progreso. Pomodoro: trabajo → descanso, y tras cada 4.º trabajo un descanso largo, hasta pulsar «Parar».",
+    bdayBlank: "Las entradas sin nombre no se han guardado.",
+    bdayMismatch: "El reloj solo ha guardado {n} entradas.",
     ambLat: "Latitud",
     ambLon: "Longitud",
     gNtf: "Avisos (MacroDroid)",
@@ -1521,9 +1555,10 @@ const TZ = [
   ["EST5EDT,M3.2.0,M11.1.0", "USA Ost (New York)", "US Eastern (New York)"],
   ["CST6CDT,M3.2.0,M11.1.0", "USA Mitte (Chicago)", "US Central (Chicago)"],
   ["PST8PDT,M3.2.0,M11.1.0", "USA West (Los Angeles)", "US Pacific (Los Angeles)"],
+  ["CET-1CEST,M3.5.0,M10.5.0/3", "Spanien (Madrid)", "Spain (Madrid)"],
   ["UTC0", "UTC", "UTC"]
 ];
-const TZ_ES = ["Europa central (Berlín, Viena, Zúrich)", "Reino Unido (Londres)", "Europa occidental (Lisboa)", "Europa oriental (Helsinki, Atenas)", "EE. UU. Este (Nueva York)", "EE. UU. Centro (Chicago)", "EE. UU. Oeste (Los Ángeles)", "UTC"];
+const TZ_ES = ["Europa central (Berlín, Viena, Zúrich)", "Reino Unido (Londres)", "Europa occidental (Lisboa)", "Europa oriental (Helsinki, Atenas)", "EE. UU. Este (Nueva York)", "EE. UU. Centro (Chicago)", "EE. UU. Oeste (Los Ángeles)", "España (Madrid)", "UTC"];
 const DEFAULT_NTP = "de.pool.ntp.org";
 const SWATCHES = ["#00ff00", "#ffffff", "#ffb46b", "#ff8000", "#ff2a2a", "#2f6bff", "#b44bff"];
 
@@ -1685,6 +1720,11 @@ function renderFace() {
     if (cfg.blink && m === 0 && hour.has(i)) c = "#ff8000";
     el.style.setProperty("--c", c);
   });
+  if (cfg.rainbow !== 0 && !dark) {  // corner LEDs: own colour each (firmware: cornerColor())
+    const seed = simMin === null && st.rainbowSeed != null ? st.rainbowSeed : Math.floor(seeded(total + 7) * 2147483647);
+    const base = rbRandom(seed, 777) & 0xFFFF, ord = minuteOrder(cfg);
+    [110, 111, 112, 113].forEach(i => { const el = cells[i], k = ord.indexOf(i); if (el && el.classList.contains("on") && k >= 0) el.style.setProperty("--c", `hsl(${Math.round(((base + k * 16384) & 0xFFFF) * 360 / 65536)} 100% 55%)`); });
+  }
   if (cornerTestLed !== null) [110, 111, 112, 113].forEach((i, k) => {
     const el = cells[i], hit = i === cornerTestLed;
     el.classList.toggle("on", hit); el.classList.toggle("num", hit);
@@ -2117,12 +2157,13 @@ async function copyText(text, btn) {
 // ---------------------------------------------------------------------------------------------
 const X = { d: null, list: [] };
 async function xLoad() {
-  if (MOCK) { X.d = { token: "demo1234demo1234", hasPass: false, hasApPass: false, amb: 0, lat: 0, lon: 0, bdayOn: 1, bdayEvery: 30, bday: [] }; }
+  if (MOCK) { X.d = { token: "demo1234demo1234", hasPass: false, hasApPass: false, amb: 0, pomo: { work: 25, brk: 5, lng: 15 }, bdayOn: 1, bdayEvery: 30, bday: [] }; }
   else { try { X.d = await call("/api/extras"); } catch (e) { return; } }
   const d = X.d;
   X.list = (d.bday || []).map(b => ({ ...b }));
   $("#xBdayOn").checked = !!d.bdayOn; $("#xBdayEvery").value = String(d.bdayEvery);
-  $("#xAmb").value = String(d.amb); $("#xLat").value = d.lat || ""; $("#xLon").value = d.lon || "";
+  $("#xAmb").value = String(d.amb);
+  const po = d.pomo || {}; $("#xPomoWork").value = po.work || 25; $("#xPomoBrk").value = po.brk || 5; $("#xPomoLng").value = po.lng || 15;
   $("#xTok").textContent = d.token;
   $("#xUrl").textContent = `http://${(cfg && st && st.ip) || location.hostname}/api/notify?key=${d.token}&type=whatsapp&text=ANA`;
   $("#xSecState").textContent = t(d.hasPass ? "secYes" : "secNo");
@@ -2141,8 +2182,8 @@ function xRenderList() {
     <input type="text" data-f="n" class="mono" maxlength="12" value="${String(b.n).replace(/~/g, "Ñ")}" style="width:9em" autocapitalize="characters" spellcheck="false">
     <button type="button" class="btn sm" data-bt="${i}">${t("bdayTest")}</button><button type="button" class="btn sm danger" data-bd="${i}">✕</button></span></div>`).join("");
 }
-async function xPost(body) {
-  try { const r = await post("/api/extras", body); toast(t("xSaved")); return r; } catch (e) { toast(t("xErr") + ": " + e.message); return null; }
+async function xPost(body, quiet) {
+  try { const r = await post("/api/extras", body); if (!quiet) toast(t("xSaved")); return r; } catch (e) { toast(t("xErr") + ": " + e.message); return null; }
 }
 
 // [V8] ntfOff checkboxes (text per notification type) and emoji import
@@ -2212,11 +2253,27 @@ function wireExtras() {
   $("#xBdayList").addEventListener("click", async e => {
     const bd = e.target.closest("[data-bd]"), bt = e.target.closest("[data-bt]");
     if (bd) { X.list.splice(Number(bd.dataset.bd), 1); xRenderList(); }
-    if (bt) { await xPost({ bday: bdayBody() }); await xLoad(); post("/api/test", { what: "bday", i: Number(bt.dataset.bt) }).catch(() => {}); }
+    if (bt) {  // save first, then test the entry (the clock stores only entries with a name -> index among those)
+      const idx = X.list.filter(b => b.n).indexOf(X.list[Number(bt.dataset.bt)]);
+      if (idx < 0) return toast(t("bdayBlank"));
+      if (await bdaySave()) post("/api/test", { what: "bday", i: idx }).catch(() => {});
+    }
   });
   const bdayBody = () => ({ on: $("#xBdayOn").checked ? 1 : 0, every: Number($("#xBdayEvery").value), list: X.list.filter(b => b.n).map(b => ({ ...b, n: b.n.replace(/Ñ/g, "~") })) });
-  $("#xBdaySave").addEventListener("click", async () => { if (await xPost({ bday: bdayBody() })) xLoad(); });
-  $("#xAmbSave").addEventListener("click", () => xPost({ amb: Number($("#xAmb").value), lat: Number($("#xLat").value) || 0, lon: Number($("#xLon").value) || 0 }));
+  // [V9] The clock answers with the list it really stored; the page shows exactly that (and warns if something was dropped)
+  async function bdaySave() {
+    const sent = bdayBody(), blank = X.list.filter(b => !b.n).length;
+    const r = await xPost({ bday: sent }, true);
+    if (!r) return false;
+    if (Array.isArray(r.bday)) { X.list = r.bday.map(b => ({ ...b })); X.d.bday = r.bday; X.d.bdayOn = sent.on; X.d.bdayEvery = sent.every; xRenderList(); }
+    else await xLoad();
+    if (typeof r.n === "number" && r.n < sent.list.length) toast(t("bdayMismatch", { n: r.n }));
+    else toast(t("xSaved") + (blank ? " – " + t("bdayBlank") : ""));
+    return true;
+  }
+  $("#xBdaySave").addEventListener("click", bdaySave);
+  $("#xAmbSave").addEventListener("click", () => xPost({ amb: Number($("#xAmb").value) }));
+  $("#xPomoSave").addEventListener("click", () => xPost({ pomo: { work: Number($("#xPomoWork").value) || 25, brk: Number($("#xPomoBrk").value) || 5, lng: Number($("#xPomoLng").value) || 15 } }));
   $("#xTokNew").addEventListener("click", async () => { if (await xPost({ newToken: true })) xLoad(); });
   $("#xNtfBtns").addEventListener("click", e => {
     const b = e.target.closest("[data-ntf]"); if (!b) return;
