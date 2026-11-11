@@ -310,6 +310,7 @@ canvas.playcv{cursor:pointer}
         <button type="button" role="tab" id="t-play" aria-controls="p-play" data-tab="play"><span data-t="tabPlay">Play</span></button>
         <button type="button" role="tab" id="t-time" aria-controls="p-time" data-tab="time"><span data-t="tabTime">Zeit</span></button>
         <button type="button" role="tab" id="t-net" aria-controls="p-net" data-tab="net"><span data-t="tabNet">Netzwerk</span></button>
+        <button type="button" role="tab" id="t-extra" aria-controls="p-extra" data-tab="extra"><span data-t="tabExtra">Extras</span></button>
         <button type="button" role="tab" id="t-sys" aria-controls="p-sys" data-tab="sys"><span data-t="tabSys">System</span></button>
       </nav>
 
@@ -541,6 +542,13 @@ canvas.playcv{cursor:pointer}
             <div class="edwrap">
               <canvas id="edCv" class="ledcv"></canvas>
               <div class="pal" id="edPal"></div>
+              <div class="inline" style="flex-wrap:wrap">
+                <b data-t="edImp"></b>
+                <input type="text" id="edImpTxt" maxlength="8" placeholder="😀" style="width:6em;font-size:20px" aria-label="emoji">
+                <label class="btn sm" for="edImpFile" data-t="edImpFile"></label><input type="file" id="edImpFile" accept="image/*" hidden>
+                <span class="muted" data-t="edImpBoost"></span><input type="range" id="edImpBoost" min="1" max="2.6" step="0.1" value="1.4">
+              </div>
+              <p class="hint" data-t="edImpHint"></p>
               <div class="inline"><span class="muted" data-t="edSlot"></span><div class="seg sm" id="edSlots" role="radiogroup"></div></div>
               <div class="btnrow">
                 <button type="button" class="btn sm" id="edClear" data-t="edClear"></button>
@@ -718,6 +726,58 @@ canvas.playcv{cursor:pointer}
             </div>
           </div>
         </section>
+
+        <!-- Extras [V7] -->
+        <section class="panel" id="p-extra" role="tabpanel" aria-labelledby="t-extra" hidden>
+          <div class="group">
+            <h3 data-t="gTimer"></h3>
+            <div class="rows"><div class="row"><span class="rt"><b data-t="tmrMin"></b></span><span class="inline">
+              <input type="number" id="xTmrMin" min="1" max="99" value="10" style="width:5em">
+              <button type="button" class="btn sm primary" id="xTmrGo" data-t="tmrStart"></button>
+              <button type="button" class="btn sm" id="xTmrPomo" data-t="tmrPomo"></button>
+              <button type="button" class="btn sm danger" id="xTmrStop" data-t="tmrStop"></button></span></div></div>
+          </div>
+          <div class="group">
+            <h3 data-t="gBday"></h3>
+            <p class="hint" data-t="bdayHint"></p>
+            <div class="rows">
+              <label class="row" for="xBdayOn"><span class="rt"><b data-t="bdayOn"></b></span><input type="checkbox" class="sw" id="xBdayOn"></label>
+              <div class="row"><span class="rt"><b data-t="bdayEvery"></b></span><select id="xBdayEvery"><option value="15">15 min</option><option value="30">30 min</option><option value="60">1 h</option><option value="120">2 h</option><option value="240">4 h</option></select></div>
+            </div>
+            <div id="xBdayList" class="rows"></div>
+            <div class="btnrow"><button type="button" class="btn sm" id="xBdayAdd" data-t="bdayAdd"></button><button type="button" class="btn sm primary" id="xBdaySave" data-t="xSave"></button></div>
+          </div>
+          <div class="group">
+            <h3 data-t="gAmb"></h3>
+            <p class="hint" data-t="ambHint"></p>
+            <div class="rows">
+              <div class="row"><span class="rt"><b data-t="gAmb"></b></span><select id="xAmb"><option value="0" data-t="amb0"></option><option value="1" data-t="amb1"></option><option value="2" data-t="amb2"></option><option value="3" data-t="amb3"></option><option value="4" data-t="amb4"></option></select></div>
+              <div class="row"><span class="rt"><b data-t="ambLat"></b></span><input type="number" id="xLat" step="0.0001" min="-90" max="90" style="width:9em"></div>
+              <div class="row"><span class="rt"><b data-t="ambLon"></b></span><input type="number" id="xLon" step="0.0001" min="-180" max="180" style="width:9em"></div>
+            </div>
+            <div class="btnrow"><button type="button" class="btn sm primary" id="xAmbSave" data-t="xSave"></button></div>
+          </div>
+          <div class="group">
+            <h3 data-t="gNtf"></h3>
+            <p class="hint" data-t="ntfHint"></p>
+            <div class="rows">
+              <div class="row"><span class="rt"><b data-t="ntfKey"></b></span><span class="inline"><code id="xTok" class="mono"></code><button type="button" class="btn sm" id="xTokNew" data-t="ntfNew"></button></span></div>
+              <div class="row"><span class="rt"><b>URL</b><small data-t="ntfUrlSub"></small></span><code id="xUrl" class="mono" style="word-break:break-all"></code></div>
+            </div>
+            <div class="btnrow" id="xNtfBtns"></div>
+            <p class="hint" data-t="ntfTxtHint"></p>
+            <div class="btnrow" id="xNtfTxt"></div>
+          </div>
+          <div class="group">
+            <h3 data-t="gSec"></h3>
+            <p class="hint" id="xSecState"></p>
+            <div class="rows">
+              <div class="row"><span class="rt"><b data-t="secPass"></b><small data-t="secPassSub"></small></span><input type="text" id="xPass" class="mono" maxlength="32" autocomplete="off" spellcheck="false" style="width:12em"></div>
+              <div class="row"><span class="rt"><b data-t="secAp"></b></span><input type="text" id="xAp" class="mono" maxlength="32" autocomplete="off" spellcheck="false" style="width:12em"></div>
+            </div>
+            <div class="btnrow"><button type="button" class="btn sm primary" id="xSecSave" data-t="xSave"></button><button type="button" class="btn sm danger" id="xPassDel" data-t="secDel"></button></div>
+          </div>
+        </section>
       </form>
     </main>
   </div>
@@ -801,6 +861,50 @@ const api = {
 // ---------------------------------------------------------------------------------------------
 const T = {
   de: {
+    tabExtra: "Extras",
+    gTimer: "Timer",
+    tmrMin: "Minuten",
+    tmrStart: "Start",
+    tmrPomo: "Pomodoro 25/5",
+    tmrStop: "Stopp",
+    gBday: "Geburtstage & Termine",
+    bdayHint: "Am angegebenen Tag läuft der Name über die Uhr. Nur Buchstaben A–Z (Ñ erlaubt), max. 12 Zeichen, max. 16 Einträge.",
+    bdayOn: "Am Tag anzeigen",
+    bdayEvery: "Wiederholung",
+    bdayAdd: "Eintrag hinzufügen",
+    xSave: "Speichern",
+    bdayK0: "Geburtstag",
+    bdayK1: "Termin (nur Text)",
+    bdayTest: "Test",
+    gAmb: "Ambiente-Modus",
+    ambHint: "Ersetzt die Wortfarbe. „Sonne“ braucht Breiten- und Längengrad (Sonnenauf-/untergang wird berechnet, ohne Internet).",
+    amb0: "Aus",
+    amb1: "Feuer",
+    amb2: "Aurora",
+    amb3: "Atmen",
+    amb4: "Sonne (nachts warm & dunkel)",
+    ambLat: "Breitengrad",
+    ambLon: "Längengrad",
+    gNtf: "Benachrichtigungen (MacroDroid)",
+    ntfHint: "MacroDroid: Aktion „HTTP-Anfrage“ (GET) an die URL unten. Typ: whatsapp, call, sms, mail, telegram, bell. Mit &text=NAME läuft ein Text. type=clear beendet den Anruf.",
+    ntfKey: "API-Schlüssel",
+    ntfNew: "Neu erzeugen",
+    ntfUrlSub: "Beispiel",
+    gSec: "Sicherheit",
+    secPass: "Passwort",
+    secPassSub: "Benutzer: admin. Leer = kein Schutz. Die Uhr startet danach neu.",
+    secAp: "Hotspot-Passwort (min. 8)",
+    secNo: "⚠ Kein Passwort: jeder im WLAN kann die Uhr ändern. Der lokale Update-Modus (Port 2022) startet nur mit Passwort.",
+    secYes: "Passwortschutz aktiv.",
+    apBad: "Hotspot-Passwort: mindestens 8 Zeichen.",
+    xSaved: "Gespeichert",
+    xErr: "Fehler",
+    secDel: "Passwort entfernen",
+    ntfTxtHint: "Name / Nummer als Lauftext anzeigen bei:",
+    edImp: "Importieren",
+    edImpFile: "Bild laden",
+    edImpBoost: "Kontrast",
+    edImpHint: "Emoji tippen oder einfügen (oder ein Bild laden): es wird auf 11 × 10 LEDs verkleinert. Danach im Editor nachbessern, ansehen und speichern. Einfache Motive mit klaren Farben funktionieren am besten.",
     tabTxt: "Lauftexte",
     tabEmoji: "Emojis",
     tabPlay: "Play",
@@ -974,6 +1078,50 @@ const T = {
     ledsOnT: "LEDs eingeschaltet", ledsOffT: "LEDs ausgeschaltet", locale: "de-DE"
   },
   en: {
+    tabExtra: "Extras",
+    gTimer: "Timer",
+    tmrMin: "Minutes",
+    tmrStart: "Start",
+    tmrPomo: "Pomodoro 25/5",
+    tmrStop: "Stop",
+    gBday: "Birthdays & special dates",
+    bdayHint: "On the given day the name scrolls across the clock. Letters A–Z only (Ñ allowed), max. 12 characters, max. 16 entries.",
+    bdayOn: "Show on the day",
+    bdayEvery: "Repeat every",
+    bdayAdd: "Add entry",
+    xSave: "Save",
+    bdayK0: "Birthday",
+    bdayK1: "Date (text only)",
+    bdayTest: "Test",
+    gAmb: "Ambient mode",
+    ambHint: "Replaces the word colour. “Sun” needs latitude and longitude (sunrise / sunset are calculated, no internet).",
+    amb0: "Off",
+    amb1: "Fire",
+    amb2: "Aurora",
+    amb3: "Breathing",
+    amb4: "Sun (warm & dim at night)",
+    ambLat: "Latitude",
+    ambLon: "Longitude",
+    gNtf: "Notifications (MacroDroid)",
+    ntfHint: "MacroDroid: action “HTTP request” (GET) to the URL below. Type: whatsapp, call, sms, mail, telegram, bell. Add &text=NAME to scroll a text. type=clear ends the call.",
+    ntfKey: "API key",
+    ntfNew: "Regenerate",
+    ntfUrlSub: "Example",
+    gSec: "Security",
+    secPass: "Password",
+    secPassSub: "User: admin. Empty = no protection. The clock restarts afterwards.",
+    secAp: "Hotspot password (min. 8)",
+    secNo: "⚠ No password: anyone on your WiFi can change the clock. The local update mode (port 2022) only starts with a password.",
+    secYes: "Password protection is on.",
+    apBad: "Hotspot password: at least 8 characters.",
+    xSaved: "Saved",
+    xErr: "Error",
+    secDel: "Remove password",
+    ntfTxtHint: "Show name / number as scrolling text for:",
+    edImp: "Import",
+    edImpFile: "Load image",
+    edImpBoost: "Contrast",
+    edImpHint: "Type or paste an emoji (or load an image): it is reduced to 11 × 10 LEDs. Then touch it up in the editor, preview it and save it. Simple shapes with clear colours work best.",
     tabTxt: "Floating texts",
     tabEmoji: "Emojis",
     tabPlay: "Play",
@@ -1147,6 +1295,50 @@ const T = {
     ledsOnT: "LEDs switched on", ledsOffT: "LEDs switched off", locale: "en-GB"
   },
   es: {
+    tabExtra: "Extras",
+    gTimer: "Temporizador",
+    tmrMin: "Minutos",
+    tmrStart: "Iniciar",
+    tmrPomo: "Pomodoro 25/5",
+    tmrStop: "Parar",
+    gBday: "Cumpleaños y fechas especiales",
+    bdayHint: "El día indicado el nombre pasa por el reloj. Solo letras A–Z (Ñ permitida), máx. 12 caracteres, máx. 16 entradas.",
+    bdayOn: "Mostrar el día indicado",
+    bdayEvery: "Repetir cada",
+    bdayAdd: "Añadir entrada",
+    xSave: "Guardar",
+    bdayK0: "Cumpleaños",
+    bdayK1: "Fecha (solo texto)",
+    bdayTest: "Probar",
+    gAmb: "Modo ambiente",
+    ambHint: "Sustituye el color de las palabras. «Sol» necesita latitud y longitud (el amanecer y el atardecer se calculan, sin internet).",
+    amb0: "Desactivado",
+    amb1: "Fuego",
+    amb2: "Aurora",
+    amb3: "Respiración",
+    amb4: "Sol (cálido y tenue de noche)",
+    ambLat: "Latitud",
+    ambLon: "Longitud",
+    gNtf: "Avisos (MacroDroid)",
+    ntfHint: "MacroDroid: acción «Petición HTTP» (GET) a la URL de abajo. Tipo: whatsapp, call, sms, mail, telegram, bell. Con &text=NOMBRE se desplaza un texto. type=clear termina la llamada.",
+    ntfKey: "Clave API",
+    ntfNew: "Regenerar",
+    ntfUrlSub: "Ejemplo",
+    gSec: "Seguridad",
+    secPass: "Contraseña",
+    secPassSub: "Usuario: admin. Vacío = sin protección. El reloj se reinicia después.",
+    secAp: "Contraseña del hotspot (mín. 8)",
+    secNo: "⚠ Sin contraseña: cualquiera en tu WiFi puede cambiar el reloj. El modo de actualización local (puerto 2022) solo arranca con contraseña.",
+    secYes: "Protección con contraseña activa.",
+    apBad: "Contraseña del hotspot: mínimo 8 caracteres.",
+    xSaved: "Guardado",
+    xErr: "Error",
+    secDel: "Quitar contraseña",
+    ntfTxtHint: "Mostrar nombre / número como texto en:",
+    edImp: "Importar",
+    edImpFile: "Cargar imagen",
+    edImpBoost: "Contraste",
+    edImpHint: "Escribe o pega un emoji (o carga una imagen): se reduce a 11 × 10 LEDs. Después retócalo en el editor, míralo en el reloj y guárdalo. Los motivos sencillos y de colores claros funcionan mejor.",
     tabTxt: "Textos flotantes",
     tabEmoji: "Emojis",
     tabPlay: "Play",
@@ -1780,7 +1972,7 @@ function readEl(el) {
 
 function onInput(e) {
   const el = e.target;
-  if (el.dataset.k === "boot1" || el.dataset.k === "boot2") el.value = el.value.toUpperCase().replace(/[^A-Z ]/g, "");
+  if (el.dataset.k === "boot1" || el.dataset.k === "boot2") el.value = el.value.toUpperCase().replace(/[^A-Z0-9 .,:!?+\/()&#@'\-]/g, "");
   if (el.id === "simTime") { simMin = Number(el.value); renderFace(); return; }
   if (el.id === "colorHex") {
     let v = el.value.trim(); if (v && v[0] !== "#") v = "#" + v;
@@ -1838,7 +2030,7 @@ function updateDirty() {
   const ch = changedKeys();
   $("#savebar").hidden = ch.length === 0;
   $("#dirtyText").textContent = ch.length === 1 ? t("dirty1") : t("dirtyN", { n: ch.length });
-  const tabOf = { led: ["color","rainbow","bright","brightNight","psu"], night: ["night","nightDays"], disp: ["lang","deSpecial","blink","date","dateInt","temp","tempInt","hum","humInt","bootText","boot1","boot2","minMode","minOrder","ledTest","setWlan","showIp"], txt: ["txt","fx.greet"], time: ["ntp","tz"], net: ["hostNum","ping","rest"], sys: ["update","pins","layout","rowMirror","maxMA"], emoji: ["fx.emoji","fx.emojiInt","fx.emojiMode","fx.mask"], play: [] };
+  const tabOf = { led: ["color","rainbow","bright","brightNight","psu"], night: ["night","nightDays"], disp: ["lang","deSpecial","blink","date","dateInt","temp","tempInt","hum","humInt","bootText","boot1","boot2","minMode","minOrder","ledTest","setWlan","showIp"], txt: ["txt","fx.greet"], time: ["ntp","tz"], net: ["hostNum","ping","rest"], sys: ["update","pins","layout","rowMirror","maxMA"], emoji: ["fx.emoji","fx.emojiInt","fx.emojiMode","fx.mask"], play: [], extra: [] };
   $$("#tabs button").forEach(b => {
     const has = ch.some(k => tabOf[b.dataset.tab].includes(k) || tabOf[b.dataset.tab].includes(k.split(".")[0]));
     let d = b.querySelector(".tdot");
@@ -1901,6 +2093,7 @@ function selectTab(id) {
   if (id === "txt") pvPlay(); else pvStop();
   if (id === "play") playEnter(); else playLeave();  // [V5]
   if (id === "emoji") renderEmojiTiles();
+  if (id === "extra") xLoad();  // [V7]
 }
 
 let toastTimer;
@@ -1917,7 +2110,131 @@ async function copyText(text, btn) {
   }
 }
 
+
+// ---------------------------------------------------------------------------------------------
+// [V7] Extras tab: timer, birthdays / special dates, ambient mode, MacroDroid notifications, security.
+// Own load / save (/api/extras), independent of the big settings form.
+// ---------------------------------------------------------------------------------------------
+const X = { d: null, list: [] };
+async function xLoad() {
+  if (MOCK) { X.d = { token: "demo1234demo1234", hasPass: false, hasApPass: false, amb: 0, lat: 0, lon: 0, bdayOn: 1, bdayEvery: 30, bday: [] }; }
+  else { try { X.d = await call("/api/extras"); } catch (e) { return; } }
+  const d = X.d;
+  X.list = (d.bday || []).map(b => ({ ...b }));
+  $("#xBdayOn").checked = !!d.bdayOn; $("#xBdayEvery").value = String(d.bdayEvery);
+  $("#xAmb").value = String(d.amb); $("#xLat").value = d.lat || ""; $("#xLon").value = d.lon || "";
+  $("#xTok").textContent = d.token;
+  $("#xUrl").textContent = `http://${(cfg && st && st.ip) || location.hostname}/api/notify?key=${d.token}&type=whatsapp&text=ANA`;
+  $("#xSecState").textContent = t(d.hasPass ? "secYes" : "secNo");
+  $("#xPass").value = ""; $("#xPass").placeholder = d.hasPass ? "••••••••" : ""; $("#xAp").value = ""; $("#xAp").placeholder = d.hasApPass ? "••••••••" : "";
+  xRenderList(); xRenderNtf(); xRenderNtfTxt();
+}
+function xRenderNtf() {
+  const kinds = ["whatsapp", "call", "sms", "mail", "telegram", "bell"];
+  $("#xNtfBtns").innerHTML = kinds.map(k => `<button type="button" class="btn sm" data-ntf="${k}">${k}</button>`).join("") + `<button type="button" class="btn sm ghost" data-ntf="clear">clear</button>`;
+}
+function xRenderList() {
+  $("#xBdayList").innerHTML = X.list.map((b, i) => `<div class="row" data-i="${i}"><span class="inline" style="flex-wrap:wrap">
+    <input type="number" data-f="d" min="1" max="31" value="${b.d}" style="width:4.2em" aria-label="d">
+    <input type="number" data-f="m" min="1" max="12" value="${b.m}" style="width:4.2em" aria-label="m">
+    <select data-f="k"><option value="0"${b.k ? "" : " selected"}>${t("bdayK0")}</option><option value="1"${b.k ? " selected" : ""}>${t("bdayK1")}</option></select>
+    <input type="text" data-f="n" class="mono" maxlength="12" value="${String(b.n).replace(/~/g, "Ñ")}" style="width:9em" autocapitalize="characters" spellcheck="false">
+    <button type="button" class="btn sm" data-bt="${i}">${t("bdayTest")}</button><button type="button" class="btn sm danger" data-bd="${i}">✕</button></span></div>`).join("");
+}
+async function xPost(body) {
+  try { const r = await post("/api/extras", body); toast(t("xSaved")); return r; } catch (e) { toast(t("xErr") + ": " + e.message); return null; }
+}
+
+// [V8] ntfOff checkboxes (text per notification type) and emoji import
+const NTF_KINDS = ["whatsapp", "call", "sms", "mail", "telegram", "bell"];
+function xRenderNtfTxt() {
+  const off = (X.d && X.d.ntfOff) || 0;
+  $("#xNtfTxt").innerHTML = NTF_KINDS.map((k, i) => `<label class="btn sm" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" data-nt="${i}"${off & (1 << i) ? "" : " checked"}>${k}</label>`).join("");
+}
+function wireNtfTxt() {
+  $("#xNtfTxt").addEventListener("change", async () => {
+    let off = 0; $$("#xNtfTxt input").forEach(c => { if (!c.checked) off |= 1 << c.dataset.nt; });
+    if (await xPost({ ntfOff: off })) X.d.ntfOff = off;
+  });
+}
+function importToEditor(src, w, h) {  // src: canvas / image / any drawable, drawn "contain" into 110 x 100 and reduced to 11 x 10
+  const cv = document.createElement("canvas"); cv.width = 110; cv.height = 100;
+  const ctx = cv.getContext("2d", { willReadFrequently: true });
+  const k = Math.min(110 / w, 100 / h), dw = w * k, dh = h * k;
+  ctx.drawImage(src, (110 - dw) / 2, (100 - dh) / 2, dw, dh);
+  const dat = ctx.getImageData(0, 0, 110, 100).data, boost = Number($("#edImpBoost").value) || 1;
+  for (let y = 0; y < 10; y++) for (let x = 0; x < 11; x++) {
+    let r = 0, g = 0, b = 0, a = 0;
+    for (let yy = 0; yy < 10; yy++) for (let xx = 0; xx < 10; xx++) {
+      const i = ((y * 10 + yy) * 110 + x * 10 + xx) * 4, al = dat[i + 3] / 255;
+      r += dat[i] * al; g += dat[i + 1] * al; b += dat[i + 2] * al; a += al;
+    }
+    if (a < 35) { edit.px[y * 11 + x] = 0; continue; }  // mostly transparent -> LED off
+    r /= a; g /= a; b /= a;
+    const gr = (r + g + b) / 3, f = v => Math.max(0, Math.min(255, (gr + (v - gr) * boost - 128) * boost + 128));
+    r = f(r); g = f(g); b = f(b);
+    let v = (Math.round(r / 255 * 7) << 5) | (Math.round(g / 255 * 7) << 2) | Math.round(b / 255 * 3);
+    edit.px[y * 11 + x] = v || 0x49;  // never "off" for a visible pixel
+  }
+  renderEditor();
+}
+function importEmojiText() {
+  const txt = $("#edImpTxt").value.trim(); if (!txt) return;
+  const cv = document.createElement("canvas"); cv.width = 110; cv.height = 110;
+  const ctx = cv.getContext("2d");
+  ctx.font = "92px 'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji','Twemoji Mozilla',sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(txt, 55, 58);
+  importToEditor(cv, 110, 110);
+}
+function wireImport() {
+  $("#edImpTxt").addEventListener("input", importEmojiText);
+  $("#edImpBoost").addEventListener("input", () => { if ($("#edImpTxt").value.trim()) importEmojiText(); else if (importImg) importToEditor(importImg, importImg.naturalWidth, importImg.naturalHeight); });
+  $("#edImpFile").addEventListener("change", e => {
+    const f = e.target.files[0]; if (!f) return;
+    const img = new Image(); img.onload = () => { importImg = img; $("#edImpTxt").value = ""; importToEditor(img, img.naturalWidth, img.naturalHeight); };
+    img.src = URL.createObjectURL(f);
+  });
+}
+let importImg = null;
+function wireExtras() {
+  wireNtfTxt(); wireImport();
+  const key = () => X.d ? "key=" + X.d.token : "";
+  $("#xTmrGo").addEventListener("click", () => post("/api/timer?" + key(), { min: Number($("#xTmrMin").value) || 10 }).catch(() => toast(t("xErr"))));
+  $("#xTmrPomo").addEventListener("click", () => post("/api/timer?" + key(), { pomo: 1 }).catch(() => toast(t("xErr"))));
+  $("#xTmrStop").addEventListener("click", () => post("/api/timer?" + key(), { cmd: "stop" }).catch(() => {}));
+  $("#xBdayAdd").addEventListener("click", () => { if (X.list.length < 16) { X.list.push({ d: 1, m: 1, k: 0, n: "" }); xRenderList(); } });
+  $("#xBdayList").addEventListener("input", e => {
+    const row = e.target.closest("[data-i]"); if (!row || !e.target.dataset.f) return;
+    const b = X.list[row.dataset.i], f = e.target.dataset.f;
+    if (f === "n") { e.target.value = e.target.value.toUpperCase().replace(/[^A-ZÑ0-9 .,:!?+\/()&#@'\-]/g, ""); b.n = e.target.value.replace(/Ñ/g, "~"); }
+    else b[f] = Number(e.target.value);
+  });
+  $("#xBdayList").addEventListener("click", async e => {
+    const bd = e.target.closest("[data-bd]"), bt = e.target.closest("[data-bt]");
+    if (bd) { X.list.splice(Number(bd.dataset.bd), 1); xRenderList(); }
+    if (bt) { await xPost({ bday: bdayBody() }); await xLoad(); post("/api/test", { what: "bday", i: Number(bt.dataset.bt) }).catch(() => {}); }
+  });
+  const bdayBody = () => ({ on: $("#xBdayOn").checked ? 1 : 0, every: Number($("#xBdayEvery").value), list: X.list.filter(b => b.n).map(b => ({ ...b, n: b.n.replace(/Ñ/g, "~") })) });
+  $("#xBdaySave").addEventListener("click", async () => { if (await xPost({ bday: bdayBody() })) xLoad(); });
+  $("#xAmbSave").addEventListener("click", () => xPost({ amb: Number($("#xAmb").value), lat: Number($("#xLat").value) || 0, lon: Number($("#xLon").value) || 0 }));
+  $("#xTokNew").addEventListener("click", async () => { if (await xPost({ newToken: true })) xLoad(); });
+  $("#xNtfBtns").addEventListener("click", e => {
+    const b = e.target.closest("[data-ntf]"); if (!b) return;
+    post("/api/notify?" + key(), { type: b.dataset.ntf, text: b.dataset.ntf === "clear" ? "" : "TEST" }).catch(() => toast(t("xErr")));
+  });
+  $("#xPassDel").addEventListener("click", async () => { if (!X.d || !X.d.hasPass) return; const r = await xPost({ pass: "" }); if (r && r.restart && !MOCK) setTimeout(() => location.reload(), 15000); });
+  $("#xSecSave").addEventListener("click", async () => {
+    const body = {}, p = $("#xPass").value, a = $("#xAp").value;
+    if (p !== "") body.pass = p;
+    if (a !== "") { if (a.length < 8) return toast(t("apBad")); body.apPass = a; }
+    if (!Object.keys(body).length) return;
+    const r = await xPost(body);
+    if (r && r.restart && !MOCK) setTimeout(() => location.reload(), 15000);
+  });
+}
+
 function wire() {
+  wireExtras();
   const form = $("#form");
   form.addEventListener("input", onInput);
   form.addEventListener("change", onInput);

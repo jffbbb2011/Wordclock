@@ -10,6 +10,21 @@
 // ###########################################################################################################################################
 // # [FORK] Layout version (10 x 11 panel) with the improvements of the fork V6.1.0.2 merged in. Own version numbers have 4 parts
 // #   (V6.1.0.1, V6.1.0.2, ...), see parseVersion() / compareVersions(). Update source: UPDATE_REPO in settings.h.
+// # [FORK] V6.1.0.8 (marked "[V8 CHANGE n]"):
+// #   1. The scrolling texts (birthdays, notifications, boot texts) now also show digits 0-9 and the symbols . , : ! ? - + / ( ) & # @ ' (getGlyph()).
+// #   2. Notification texts (name / number of the caller or sender) can be switched off per type (WhatsApp, call, SMS, mail, Telegram, bell): tab "Extras".
+// #   3. Web page: emoji import in the emoji editor (type / paste an emoji or load an image -> converted to 11 x 10 LEDs, then edit / preview / save).
+// # [FORK] V6.1.0.7 (marked "[V7 CHANGE n]" in the code):
+// #   1. SECURITY: optional password (user "admin") for the web page, the whole /api and the REST server on port 55555 (there also ?key=<API key>);
+// #      the local update page (port 2022) now starts ONLY if a password is set; host check (against DNS rebinding) and Origin check for POST
+// #      (against malicious web pages); optional password for the "WordClock" setup hotspot (min. 8 characters). All in the web tab "Extras".
+// #   2. NEW: timer / countdown and pomodoro (25/5), birthdays and special dates (list of 16, shown every 15-240 min on the day), ambient modes
+// #      (fire, aurora, breathing, sun = warm and dim at night, sunrise / sunset calculated from latitude / longitude, no API), notification icons
+// #      (WhatsApp, phone call, SMS, mail, Telegram, bell) with optional scrolling text.
+// #   3. NEW API for MacroDroid / automations (API key in the URL, see tab "Extras"):
+// #        /api/notify?key=KEY&type=whatsapp|call|sms|mail|telegram|bell&text=NAME   (type=clear ends the ringing phone)
+// #        /api/timer?key=KEY&min=10  (or sec=, pomo=1, cmd=stop)
+// #   Not changed: the update download from GitHub still does not verify the certificate (setInsecure).
 // # [FORK] V6.1.0.2: WiFi reset button (BUTTON_PIN / BUTTON_HOLD_MS in settings.h): checkResetButton() is called from serviceDelay().
 // # [FORK] Floating texts (date / temperature / humidity): selectable style, speed and hold time (txtRec, stored in the EEPROM);
 // #   temperature / humidity styles 2 = "compact" (small 3x5 digits + small unit) and 3 = "compact + colour bar" (TXT_BAR_TEMP_MIN / MAX).
@@ -108,7 +123,7 @@ SET_LOOP_TASK_STACK_SIZE(24 * 1024);
 // ###########################################################################################################################################
 // # Version number of the code:
 // ###########################################################################################################################################
-const char* WORD_CLOCK_VERSION = "V6.1.0.6";  // [V6 CHANGE 1] was "V6.1.0.5" - ONE firmware for the standard and the big panel (web page: System > Layout). Older notes: [V5 CHANGE 4] was "V6.1.0.4" - emojis, Christmas / New Year greetings, Play tab (games). Older notes: [V4 CHANGE 5] was "V6.1.0.3" - date separator setting. Older notes:  // [V3 CHANGE 4] was "V6.1.0.2" - must be exactly the GitHub release tag. V6.1.0.3 = fix: temperature / humidity / date timers (see V3 CHANGE 1-3).
+const char* WORD_CLOCK_VERSION = "V6.1.0.8";  // [V6 CHANGE 1] was "V6.1.0.5" - ONE firmware for the standard and the big panel (web page: System > Layout). Older notes: [V5 CHANGE 4] was "V6.1.0.4" - emojis, Christmas / New Year greetings, Play tab (games). Older notes: [V4 CHANGE 5] was "V6.1.0.3" - date separator setting. Older notes:  // [V3 CHANGE 4] was "V6.1.0.2" - must be exactly the GitHub release tag. V6.1.0.3 = fix: temperature / humidity / date timers (see V3 CHANGE 1-3).
 // [FORK] previous note:  // [FORK] the release tag on GitHub must be exactly this text
 
 
@@ -350,8 +365,59 @@ struct layRec {
 } lay;
 #define LAY_MAGIC 0x57434C31UL  // "WCL1"
 #define LAY_OFFSET (FX_OFFSET + ((sizeof(fxRec) + 3) / 4) * 4)
-#define EEPROM_SIZE (LAY_OFFSET + sizeof(layRec))
 
+
+// ###########################################################################################################################################
+// # [V7 CHANGE 1] Extras: password, hotspot password, API key, birthdays, ambient mode. Own record with own magic number behind the layRec.
+// ###########################################################################################################################################
+struct bdayRec {
+  uint8_t used, d, m, kind;  // kind: 0 = birthday (greeting + name), 1 = special date (only the text)
+  char name[13];
+};
+struct xtRec {
+  uint32_t magic;
+  char pass[33];     // password of the web page / API / update page (user "admin"), empty = no protection
+  char apPass[33];   // password of the "WordClock" setup hotspot (min. 8 characters), empty = open hotspot
+  char token[17];    // API key for MacroDroid (/api/notify, /api/timer)
+  uint8_t ambMode;   // 0 = off, 1 = fire, 2 = aurora, 3 = breathing, 4 = sun (warm / dim at night)
+  uint8_t bdayOn;
+  uint8_t bdayEvery; // repeat interval in units of 15 minutes
+  uint8_t ntfOff;    // [V8] bit set = no text (name) for that notification type: 0 WhatsApp, 1 call, 2 SMS, 3 mail, 4 Telegram, 5 bell
+  float lat, lon;
+  bdayRec bday[16];
+} xt;
+#define XT_MAGIC 0x57435831UL  // "WCX1"
+#define XT_OFFSET (LAY_OFFSET + ((sizeof(layRec) + 3) / 4) * 4)
+#define EEPROM_SIZE (XT_OFFSET + sizeof(xtRec))
+
+void xtNewToken() {
+  static const char cs[] = "abcdefghjkmnpqrstuvwxyz23456789";
+  for (int i = 0; i < 16; i++) {
+#if defined(ESP32)
+    uint32_t r = esp_random();
+#else
+    uint32_t r = RANDOM_REG32;
+#endif
+    xt.token[i] = cs[r % (sizeof(cs) - 1)];
+  }
+  xt.token[16] = 0;
+}
+
+void xtDefaults() {
+  memset(&xt, 0, sizeof(xt));
+  xt.magic = XT_MAGIC;
+  xt.bdayOn = 1;
+  xt.bdayEvery = 2;  // every 30 minutes
+  xtNewToken();
+}
+
+void writeXtConfig() {
+  xt.magic = XT_MAGIC;
+  EEPROM.put(XT_OFFSET, xt);
+  EEPROM.commit();
+}
+
+bool ambReady = false;  // [V8 FIX] ambient modes: a picture of the clock is ready (declared here because loop() uses it)
 bool playActive = false;       // [V5 CHANGE 3] a game from the web page is running (see playLoop())
 unsigned long playLastMs = 0;  // millis() of the last picture of the game
 
@@ -619,6 +685,7 @@ void loop() {
   ESP_WDT_FEED();  // Reset watchdog timer
   handleTime();    // handle NTP / RTC time
   serviceDelay(750);
+  ambReady = false;  // [V7] ShowTheTime() takes a new snapshot for the ambient modes
 
   if (!timeValid) {  // Neither NTP nor RTC delivered a time yet: show that WiFi is needed
     pixels.setBrightness(intensity);
@@ -682,7 +749,7 @@ void loop() {
   // PING function:
   if (PING_USEMONITOR == 1 && WiFi.status() == WL_CONNECTED) PingIP();
 
-  if (LEDsON == true && RESTmanLEDsON == true && !playActive) showLimited();  // This sends the updated pixel color to the hardware.
+  if (LEDsON == true && RESTmanLEDsON == true && !playActive && !(xt.ambMode && ambReady)) showLimited();  // This sends the updated pixel color to the hardware.
 }
 
 
@@ -835,6 +902,14 @@ void readEEPROM() {
   // [V5] Emoji / greeting settings, use the defaults if none are stored yet:
   EEPROM.get(FX_OFFSET, fx);
   if (fx.magic != FX_MAGIC || fx.emojiMode > 1 || fx.emojiIntSec < 30 || fx.emojiIntSec > 43200) fxDefaults();
+
+  // [V7] Extras (password, API key, birthdays, ambient mode):
+  EEPROM.get(XT_OFFSET, xt);
+  if (xt.magic != XT_MAGIC || xt.ambMode > 4 || xt.bdayEvery < 1 || xt.bdayEvery > 16) {
+    xtDefaults();
+    writeXtConfig();
+  }
+  xt.pass[32] = xt.apPass[32] = xt.token[16] = 0;
 }
 
 
@@ -950,6 +1025,7 @@ void serviceDelay(unsigned long ms) {
   do {
     checkClient();
     checkResetButton();  // [FORK] WiFi reset button, polled every ~5 ms
+    ambientTick();       // [V7] ambient modes
     delay(5);
   } while (millis() - start < ms);
 }
@@ -1233,6 +1309,28 @@ const byte fontPercent[5] = { 0x23, 0x13, 0x08, 0x64, 0x62 };  // '%' symbol, us
 // # Looks up the 5x7 glyph for a letter. Returns nullptr for a space (or any letter that is not defined above), which simply
 // # leaves that character's column blank when scrolling:
 // ###########################################################################################################################################
+// [V8 CHANGE 1] Digits and symbols for the scrolling texts (classic 5x7 font, bit 0 = top row, same format as fontA ...).
+static const struct { char c; byte d[5]; } EXTRA_GLYPHS[] = {
+  { '0', { 0x3E, 0x51, 0x49, 0x45, 0x3E } }, { '1', { 0x00, 0x42, 0x7F, 0x40, 0x00 } }, { '2', { 0x42, 0x61, 0x51, 0x49, 0x46 } },
+  { '3', { 0x21, 0x41, 0x45, 0x4B, 0x31 } }, { '4', { 0x18, 0x14, 0x12, 0x7F, 0x10 } }, { '5', { 0x27, 0x45, 0x45, 0x45, 0x39 } },
+  { '6', { 0x3C, 0x4A, 0x49, 0x49, 0x30 } }, { '7', { 0x01, 0x71, 0x09, 0x05, 0x03 } }, { '8', { 0x36, 0x49, 0x49, 0x49, 0x36 } },
+  { '9', { 0x06, 0x49, 0x49, 0x29, 0x1E } }, { '.', { 0x00, 0x60, 0x60, 0x00, 0x00 } }, { ',', { 0x00, 0xA0, 0x60, 0x00, 0x00 } },
+  { ':', { 0x00, 0x36, 0x36, 0x00, 0x00 } }, { '!', { 0x00, 0x00, 0x5F, 0x00, 0x00 } }, { '?', { 0x02, 0x01, 0x51, 0x09, 0x06 } },
+  { '-', { 0x08, 0x08, 0x08, 0x08, 0x08 } }, { '+', { 0x08, 0x08, 0x3E, 0x08, 0x08 } }, { '/', { 0x20, 0x10, 0x08, 0x04, 0x02 } },
+  { '(', { 0x00, 0x1C, 0x22, 0x41, 0x00 } }, { ')', { 0x00, 0x41, 0x22, 0x1C, 0x00 } }, { '&', { 0x36, 0x49, 0x55, 0x22, 0x50 } },
+  { '#', { 0x14, 0x7F, 0x14, 0x7F, 0x14 } }, { '@', { 0x32, 0x49, 0x79, 0x41, 0x3E } }, { '\'', { 0x00, 0x05, 0x03, 0x00, 0x00 } },
+};
+bool isTextChar(char c) {  // characters the scrolling font can draw (besides A-Z and space)
+  for (unsigned i = 0; i < sizeof(EXTRA_GLYPHS) / sizeof(EXTRA_GLYPHS[0]); i++)
+    if (EXTRA_GLYPHS[i].c == c) return true;
+  return false;
+}
+const byte* extraGlyph(char c) {
+  for (unsigned i = 0; i < sizeof(EXTRA_GLYPHS) / sizeof(EXTRA_GLYPHS[0]); i++)
+    if (EXTRA_GLYPHS[i].c == c) return EXTRA_GLYPHS[i].d;
+  return nullptr;
+}
+
 const byte* getGlyph(char c) {
   switch (c) {
     case 'A': return fontA;
@@ -1261,7 +1359,7 @@ const byte* getGlyph(char c) {
     case 'X': return fontX;
     case 'Y': return fontY;
     case 'Z': return fontZ;
-    default: return nullptr;  // space / unsupported character (accents, digits, punctuation, ...) -> blank column
+    default: return extraGlyph(c);  // [V8] digits and symbols; space / unsupported character -> nullptr = blank column
   }
 }
 
@@ -2286,7 +2384,579 @@ unsigned long nextAutoShow(unsigned long scheduled, int intervalSec) {
   return next;
 }
 
+// ###########################################################################################################################################
+// # [V7 CHANGE 2] NEW FUNCTIONS (V6.1.0.7): notification icons (MacroDroid), timer / pomodoro, birthdays and special dates, ambient modes.
+// # Settings: xtRec (EEPROM, own magic number), web page tab "Extras".
+// ###########################################################################################################################################
+
+// Notification / birthday icons: 11 columns x 10 rows (top row first), colours as in emojiColor().
+static const char ICO_WA[] PROGMEM = "...GGGGG.....GGGGGGG...GGGGGGWWG.GGGGGGWWGGGGGGGGWWGGGGGGGWWWGGGGGGGWWGGGGGGG.GWWGGGGGG...GGGGGGG...GG........";
+static const char ICO_CALL1[] PROGMEM = "GGG........GGGG.......GGGG........GGG.........GGG.........GGGG.........GGGGG........GGGG......GGGGG......GGGG.";
+static const char ICO_CALL2[] PROGMEM = "GGG....Y.Y.GGGG....Y.YGGGG........GGG.........GGG.........GGGG.........GGGGG........GGGG......GGGGG......GGGG.";
+static const char ICO_SMS[] PROGMEM = ".WWWWWWWWW.WWWWWWWWWWWWWWWWWWWWWWWWBWWBWWBWWWWWWWWWWWWWWWWWWWWWWWW.WWWWWWWWW...WWW.........WW..........W......";
+static const char ICO_MAIL[] PROGMEM = "...........WWWWWWWWWWWWWBWWWWWBWWWWWBWWWBWWWWWWWBWBWWWWWWWWWBWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW...........";
+static const char ICO_TG[] PROGMEM = "...BBBBB.....BBBBBBB...BBBBBBBBB.BBBBWWWWWBBBBWWWWWWBBBBBBBWWWWBBBBBBBBWWBBBB.BBBBBWBBB...BBBBBBB.....BBBBB...";
+static const char ICO_BELL[] PROGMEM = ".....Y.........YYY.......YYYYY......YYYYY.....YYYYYYY....YYYYYYY...YYYYYYYYY.YYYYYYYYYYY...............OOO....";
+static const char ICO_CAKE[] PROGMEM = "...Y.Y.Y......W.W.W.....PPPPPPP...WWWWWWWWW..WRWRWRWRW..WWWWWWWWW..OOOOOOOOO..OOOOOOOOO..OOOOOOOOO.WWWWWWWWWWW";
+
+
+// ---- Pending notification (set by /api/notify, shown by xtFrontTick() from ShowTheTime()) ----
+bool ntfPending = false;
+bool ntfClear = false;  // "clear" / "callend": ends the ringing phone
+String ntfType = "";
+String ntfText = "";
+unsigned long ntfStamp = 0;
+
+// ---- Timer / pomodoro ----
+bool tmrActive = false;
+unsigned long tmrEnd = 0;
+unsigned long tmrTotal = 1000;
+uint8_t tmrPomo = 0;   // 0 = plain timer, 1 = pomodoro work, 2 = pomodoro break
+uint8_t tmrCycle = 0;  // finished pomodoro work phases
+
+// ---- Ambient modes ----
+uint8_t ambBase[NUMPIXELS * 3];
+uint8_t ambNoise[NUMPIXELS];
+unsigned long ambLastMs = 0;
+
+// Keeps A-Z, digits, symbols, space and N-tilde ('~'); accents are reduced to the plain letter.
+String ntfClean(const String& in, int maxLen) {
+  String out;
+  for (unsigned i = 0; i < in.length() && (int)out.length() < maxLen; i++) {
+    uint8_t c = (uint8_t)in[i];
+    if (c == 0xC3 && i + 1 < in.length()) {
+      uint8_t d = (uint8_t)in[++i];
+      char m = 0;
+      if ((d >= 0x80 && d <= 0x85) || (d >= 0xA0 && d <= 0xA5)) m = 'A';
+      else if ((d >= 0x88 && d <= 0x8B) || (d >= 0xA8 && d <= 0xAB)) m = 'E';
+      else if ((d >= 0x8C && d <= 0x8F) || (d >= 0xAC && d <= 0xAF)) m = 'I';
+      else if ((d >= 0x92 && d <= 0x96) || (d >= 0xB2 && d <= 0xB6)) m = 'O';
+      else if ((d >= 0x99 && d <= 0x9C) || (d >= 0xB9 && d <= 0xBC)) m = 'U';
+      else if (d == 0x91 || d == 0xB1) m = '~';
+      else if (d == 0x87 || d == 0xA7) m = 'C';
+      else if (d == 0x9F) m = 'S';
+      if (m) out += m;
+      continue;
+    }
+    if (c >= 0x80) continue;
+    if (c >= 'a' && c <= 'z') c -= 32;
+    if ((c >= 'A' && c <= 'Z') || c == '~' || isTextChar((char)c)) out += (char)c;  // [V8] digits and symbols too
+    else if (c >= ' ') out += ' ';
+  }
+  out.trim();
+  return out;
+}
+
+void paintIcon(const char* p, int c0, int c1) {
+  dunkel();
+  for (int r = 0; r < 10; r++)
+    for (int c = c0; c < c1; c++) {
+      uint32_t col = emojiColor((char)pgm_read_byte(p + r * 11 + c));
+      if (col) setPx(ledXY(c, 9 - r), col);
+    }
+}
+
+// Scrolls a text (letters only) from right to left. rainbow = every letter another colour, otherwise colour "col".
+void scrollMsg(const char* s, bool rainbow, uint32_t col, int speedMs) {
+  int n = strlen(s);
+  for (int x = 11; x > -(n * 6 + 1); x--) {
+    dunkel();
+    for (int i = 0; i < n; i++) {
+      int px = x + i * 6;
+      if (px > 10 || px < -5) continue;
+      greetLetter(s[i], px, rainbow ? greetColor(2, i) : col);
+    }
+    showLimited();
+    if (!fxWait(speedMs)) return;
+  }
+  dunkel();
+  showLimited();
+}
+
+// Icon wipes in from the left, blinks 3 times, wipes out.
+void iconAnim(const char* ico) {
+  for (int c = 1; c <= 11; c++) {
+    paintIcon(ico, 0, c);
+    showLimited();
+    if (!fxWait(35)) return;
+  }
+  for (int i = 0; i < 3; i++) {
+    if (!fxWait(700)) return;
+    dunkel();
+    showLimited();
+    if (!fxWait(180)) return;
+    paintIcon(ico, 0, 11);
+    showLimited();
+  }
+  if (!fxWait(900)) return;
+  dunkel();
+  showLimited();
+}
+
+void showNotify(const String& type, String text) {
+  const char* ico = ICO_BELL;
+  bool call = false;
+  int bit = 5;
+  if (type == "whatsapp" || type == "wa") { ico = ICO_WA; bit = 0; }
+  else if (type == "call" || type == "phone" || type == "llamada") { ico = ICO_CALL1; call = true; bit = 1; }
+  else if (type == "sms") { ico = ICO_SMS; bit = 2; }
+  else if (type == "mail" || type == "email") { ico = ICO_MAIL; bit = 3; }
+  else if (type == "telegram") { ico = ICO_TG; bit = 4; }
+  if (xt.ntfOff & (1 << bit)) text = "";  // [V8] text switched off for this type (Extras tab)
+  ntfClear = false;
+  uint32_t col = pixels.Color(0, 200, 0);
+  if (call) {  // the phone rings until "clear" / "callend", until a new notification arrives or for 45 s at most
+    unsigned long t0 = millis();
+    int f = 0, cycles = 0;
+    bool textDone = (text.length() == 0);
+    while (!ntfClear && !ntfPending && millis() - t0 < 45000UL) {
+      paintIcon(f ? ICO_CALL2 : ICO_CALL1, 0, 11);
+      showLimited();
+      if (!fxWait(400)) return;
+      f ^= 1;
+      if (++cycles == 8 && !textDone) {
+        textDone = true;
+        scrollMsg(text.c_str(), false, col, 75);
+      }
+    }
+    dunkel();
+    showLimited();
+    return;
+  }
+  iconAnim(ico);
+  if (text.length()) scrollMsg(text.c_str(), false, col, 75);
+}
+
+// ---- Timer ----
+void tmrStart(unsigned long sec, uint8_t pomo) {
+  tmrActive = true;
+  tmrPomo = pomo;
+  tmrTotal = sec * 1000UL;
+  tmrEnd = millis() + tmrTotal;
+}
+
+const char* tmrWord(int w) {  // 0 = done, 1 = work, 2 = break
+  static const char* const t[3][3] = { { "FERTIG", "ARBEIT", "PAUSE" }, { "DONE", "WORK", "BREAK" }, { "LISTO", "TRABAJO", "DESCANSO" } };
+  int l = (switchLangWeb >= 0 && switchLangWeb <= 2) ? switchLangWeb : 0;
+  return t[l][w];
+}
+
+void tmrDrawNum(const char* s, int x, int yTop, uint32_t col) {
+  for (; *s; s++, x += 4) {
+    if (*s < '0' || *s > '9') continue;
+    for (int r = 0; r < 5; r++)
+      for (int c = 0; c < 3; c++)
+        if (TXT_FONT3X5[*s - '0'][r] & (4 >> c)) {
+          int led = ledXY(x + c, yTop - r);
+          if (led >= 0) setPx(led, col);
+        }
+  }
+}
+
+void tmrFinished() {
+  uint8_t pomo = tmrPomo;
+  for (int i = 0; i < 3; i++) {  // flash
+    for (int p = 0; p < 110; p++) setPx(p, pixels.Color(0, 200, 0));
+    showLimited();
+    if (!fxWait(300)) return;
+    dunkel();
+    showLimited();
+    if (!fxWait(250)) return;
+  }
+  if (pomo == 0) {
+    tmrActive = false;
+    scrollMsg(tmrWord(0), true, 0, 75);
+    return;
+  }
+  if (pomo == 1) {  // work finished -> break (every 4th time a long one)
+    tmrCycle++;
+    scrollMsg(tmrWord(2), false, pixels.Color(0, 200, 0), 75);
+    tmrStart((tmrCycle % 4 == 0) ? 15UL * 60 : 5UL * 60, 2);
+  } else {
+    scrollMsg(tmrWord(1), false, pixels.Color(255, 90, 0), 75);
+    tmrStart(25UL * 60, 1);
+  }
+}
+
+// Shows the countdown instead of the time. true = the display was taken over.
+bool tmrTick() {
+  if (!tmrActive) return false;
+  long rem = (long)(tmrEnd - millis());
+  if (rem <= 0) {
+    tmrFinished();
+    return true;
+  }
+  int s = (rem + 999) / 1000;
+  char mm[4], ss[4];
+  snprintf(mm, sizeof(mm), "%02d", min(s / 60, 99));
+  snprintf(ss, sizeof(ss), "%02d", s % 60);
+  uint32_t c1 = (tmrPomo == 1) ? pixels.Color(255, 90, 0) : (tmrPomo == 2) ? pixels.Color(0, 200, 0) : pixels.Color(redVal, greenVal, blueVal);
+  uint32_t c2 = pixels.Color(110, 110, 110);
+  dunkel();
+  tmrDrawNum(mm, 2, 9, c1);
+  tmrDrawNum(ss, 2, 4, c2);
+  int done = (int)((tmrTotal - (unsigned long)rem) * 4UL / tmrTotal);  // corner LEDs = elapsed quarters
+  for (int i = 0; i < 4; i++) setPx(110 + i, (i <= done) ? c1 : 0);
+  return true;
+}
+
+// ---- Birthdays / special dates ----
+void bdayShow(int i) {
+  if (i < 0 || i >= 16 || !xt.bday[i].used) return;
+  String n = ntfClean(String(xt.bday[i].name), 12);
+  if (xt.bday[i].kind == 0) {
+    iconAnim(ICO_CAKE);
+    static const char* const pre[3] = { "ALLES GUTE ", "HAPPY BIRTHDAY ", "FELIZ CUMPLE " };
+    String s = String(pre[(switchLangWeb >= 0 && switchLangWeb <= 2) ? switchLangWeb : 0]) + n;
+    scrollMsg(s.c_str(), true, 0, 75);
+  } else {
+    scrollMsg(n.c_str(), true, 0, 75);
+  }
+}
+
+int bdayTriggerNow = -1;
+
+void bdayTick() {
+  static long lastSlot = -1;
+  if (bdayTriggerNow >= 0) {
+    int i = bdayTriggerNow;
+    bdayTriggerNow = -1;
+    bdayShow(i);
+  }
+  if (!xt.bdayOn) return;
+  int every = max((int)xt.bdayEvery, 1) * 15;
+  long slot = (long)(iMonth * 100 + iDay) * 1000L + (iHour * 60 + iMinute) / every;
+  if (slot == lastSlot) return;
+  lastSlot = slot;
+  for (int i = 0; i < 16; i++)
+    if (xt.bday[i].used && xt.bday[i].d == iDay && xt.bday[i].m == iMonth) bdayShow(i);
+}
+
+// ---- Ambient modes ----
+// Sunrise / sunset in local minutes (NOAA approximation). return: 0 = normal, 1 = polar day, -1 = polar night.
+int sunTimes(float lat, float lon, int doy, int tzMin, float& rise, float& set) {
+  float g = 2.0f * PI / 365.0f * doy;
+  float eq = 229.18f * (0.000075f + 0.001868f * cosf(g) - 0.032077f * sinf(g) - 0.014615f * cosf(2 * g) - 0.040849f * sinf(2 * g));
+  float dec = 0.006918f - 0.399912f * cosf(g) + 0.070257f * sinf(g) - 0.006758f * cosf(2 * g) + 0.000907f * sinf(2 * g) - 0.002697f * cosf(3 * g) + 0.00148f * sinf(3 * g);
+  float la = lat * PI / 180.0f;
+  float x = cosf(90.833f * PI / 180.0f) / (cosf(la) * cosf(dec)) - tanf(la) * tanf(dec);
+  if (x >= 1.0f) return -1;
+  if (x <= -1.0f) return 1;
+  float ha = acosf(x) * 180.0f / PI;
+  rise = 720.0f - 4.0f * (lon + ha) - eq + tzMin;
+  set = 720.0f - 4.0f * (lon - ha) - eq + tzMin;
+  return 0;
+}
+
+float smoothStep(float a, float b, float v) {
+  float t = (v - a) / (b - a);
+  t = t < 0 ? 0 : (t > 1 ? 1 : t);
+  return t * t * (3 - 2 * t);
+}
+
+float sunDayness() {  // 0 = night, 1 = day, smooth around sunrise / sunset
+  if (xt.lat == 0.0f && xt.lon == 0.0f) return 1.0f;
+  time_t n = time(nullptr);
+  struct tm lt, gt;
+  localtime_r(&n, &lt);
+  gmtime_r(&n, &gt);
+  gt.tm_isdst = -1;
+  int tz = (int)((long)n - (long)mktime(&gt)) / 60;
+  float rise = 0, set = 0;
+  int pol = sunTimes(xt.lat, xt.lon, lt.tm_yday, tz, rise, set);
+  if (pol) return pol > 0 ? 1.0f : 0.0f;
+  float now = lt.tm_hour * 60.0f + lt.tm_min;
+  return smoothStep(rise - 30, rise + 30, now) * (1.0f - smoothStep(set - 30, set + 30, now));
+}
+
+void ambSnapshot() {
+  memcpy(ambBase, pixels.getPixels(), NUMPIXELS * 3);
+  ambReady = true;
+}
+
+// Called every ~5 ms from serviceDelay(): re-colours the lit LEDs of the last picture (buffer order of NEO_GRB: byte 0 = G, 1 = R, 2 = B).
+void ambientTick() {
+  if (!xt.ambMode || !ambReady || playActive || !LEDsON || !RESTmanLEDsON) return;
+  unsigned long now = millis();
+  if (now - ambLastMs < (xt.ambMode == 4 ? 1000UL : 70UL)) return;
+  ambLastMs = now;
+  uint8_t* b = pixels.getPixels();
+  float t = now / 1000.0f;
+  float day = (xt.ambMode == 4) ? sunDayness() : 1.0f;
+  float breath = 0.35f + 0.65f * (0.5f + 0.5f * sinf(t * 2.0f * PI / 6.0f));
+  for (int i = 0; i < NUMPIXELS; i++) {
+    uint8_t g0 = ambBase[i * 3], r0 = ambBase[i * 3 + 1], b0 = ambBase[i * 3 + 2];
+    uint8_t l = max(max(g0, r0), b0);
+    if (!l) continue;
+    float r = r0, g = g0, bl = b0;
+    if (xt.ambMode == 1) {  // fire
+      ambNoise[i] += ((int)random(90, 256) - (int)ambNoise[i]) / 3;
+      float f = ambNoise[i] / 255.0f;
+      r = l * f;
+      g = l * f * f * 0.45f;
+      bl = 0;
+    } else if (xt.ambMode == 2) {  // aurora: green -> turquoise -> violet waves
+      float hue = 36000.0f + 14000.0f * sinf(t / 4.0f + (i % 11) * 0.45f + (i / 11) * 0.3f);
+      uint32_t c = pixels.ColorHSV((uint16_t)hue, 255, 255);
+      r = ((c >> 16) & 255) * l / 255.0f;
+      g = ((c >> 8) & 255) * l / 255.0f;
+      bl = (c & 255) * l / 255.0f;
+    } else if (xt.ambMode == 3) {  // breathing
+      r *= breath; g *= breath; bl *= breath;
+    } else if (xt.ambMode == 4) {  // sun: warm and dim at night, the chosen colour by day
+      float k = 0.35f + 0.65f * day;
+      r *= k;
+      g *= k * (0.45f + 0.55f * day);
+      bl *= k * (0.15f + 0.85f * day);
+    }
+    b[i * 3] = (uint8_t)min(g, 255.0f);
+    b[i * 3 + 1] = (uint8_t)min(r, 255.0f);
+    b[i * 3 + 2] = (uint8_t)min(bl, 255.0f);
+  }
+  showLimited();
+}
+
+// Called at the start of ShowTheTime(): pending notification, running timer. true = the timer shows its countdown, skip the clock.
+bool xtFrontTick() {
+  if (ntfPending) {
+    ntfPending = false;
+    if (millis() - ntfStamp < 60000UL) showNotify(ntfType, ntfText);
+  }
+  return tmrTick();
+}
+
+// ###########################################################################################################################################
+// # [V7 CHANGE 1] SECURITY: password (user "admin") for the web page, the API and the update page, host / origin check, API key.
+// ###########################################################################################################################################
+bool xtHostAllowed() {  // against DNS rebinding: only an IP address, "<name>.local" or the own host name
+  String h = server.hostHeader();
+  if (!h.length()) return true;
+  int c = h.indexOf(':');
+  if (c >= 0) h = h.substring(0, c);
+  h.toLowerCase();
+  if (h.endsWith(".local") || h == "localhost") return true;
+  bool ip = h.length() > 0;
+  for (unsigned i = 0; i < h.length(); i++)
+    if (!isdigit(h[i]) && h[i] != '.') ip = false;
+  if (ip) return true;
+  String my = String(wchostname + wchostnamenum);
+  my.toLowerCase();
+  return h == my;
+}
+
+bool xtOriginOk() {  // POST from another web page: the Origin header does not match the host
+  if (server.method() == HTTP_GET) return true;
+  String o = server.header("Origin");
+  if (!o.length()) return true;
+  o.toLowerCase();
+  int p = o.indexOf("://");
+  String oh = (p >= 0) ? o.substring(p + 3) : o;
+  String hh = server.hostHeader();
+  hh.toLowerCase();
+  return oh == hh;
+}
+
+bool guardOk() {
+  if (!xtHostAllowed() || !xtOriginOk()) {
+    server.send(403, "text/plain", "Forbidden");
+    return false;
+  }
+  if (xt.pass[0] && !server.authenticate("admin", xt.pass)) {
+    server.requestAuthentication();
+    return false;
+  }
+  return true;
+}
+
+bool tokenOk() {  // API key from the URL (?key=...), compared in constant time
+  String k = server.arg("key");
+  size_t n = strlen(xt.token);
+  if (n == 0 || k.length() != n) return false;
+  uint8_t d = 0;
+  for (size_t i = 0; i < n; i++) d |= (uint8_t)(k[i] ^ xt.token[i]);
+  return d == 0;
+}
+
+bool authOrToken() {
+  return tokenOk() || guardOk();
+}
+
+bool restOk() {  // REST server on port 55555: only protected once a password is set; the API key (?key=...) works as well
+  if (!xt.pass[0]) return true;
+  String k = server1->arg("key");
+  if (k.length() && k == xt.token) return true;
+  if (server1->authenticate("admin", xt.pass)) return true;
+  server1->requestAuthentication();
+  return false;
+}
+
+// ###########################################################################################################################################
+// # [V7 CHANGE 3] API of the "Extras" tab and for MacroDroid:
+// #   GET/POST /api/extras                      settings of the new functions (password, birthdays, ambient mode, API key)
+// #   GET/POST /api/notify?key=KEY&type=whatsapp|call|sms|mail|telegram|bell&text=NAME   shows an icon (+ text); type=clear ends a call
+// #   GET/POST /api/timer?key=KEY&min=10 | sec=90 | pomo=1 | cmd=stop
+// ###########################################################################################################################################
+void handleApiExtrasGet() {
+  JsonDocument d;
+  d["ok"] = true;
+  d["hasPass"] = xt.pass[0] != 0;
+  d["hasApPass"] = xt.apPass[0] != 0;
+  d["token"] = (const char*)xt.token;
+  d["amb"] = xt.ambMode;
+  d["lat"] = xt.lat;
+  d["lon"] = xt.lon;
+  d["bdayOn"] = xt.bdayOn;
+  d["bdayEvery"] = xt.bdayEvery * 15;
+  d["ntfOff"] = xt.ntfOff;
+  d["tmr"] = tmrActive ? (int)max(0L, (long)(tmrEnd - millis()) / 1000L) : 0;
+  JsonArray a = d["bday"].to<JsonArray>();
+  for (int i = 0; i < 16; i++) {
+    if (!xt.bday[i].used) continue;
+    JsonObject o = a.add<JsonObject>();
+    o["d"] = xt.bday[i].d;
+    o["m"] = xt.bday[i].m;
+    o["k"] = xt.bday[i].kind;
+    o["n"] = (const char*)xt.bday[i].name;
+  }
+  sendJson(200, d);
+}
+
+void handleApiExtrasPost() {
+  JsonDocument d;
+  if (deserializeJson(d, server.arg("plain"))) return sendError(400, "invalid JSON");
+  bool restart = false;
+  if (!d["pass"].isNull()) {
+    String p = d["pass"] | "";
+    if (p.length() > 32) return sendError(400, "pass");
+    if (strcmp(p.c_str(), xt.pass) != 0) {
+      strncpy(xt.pass, p.c_str(), sizeof(xt.pass) - 1);
+      xt.pass[sizeof(xt.pass) - 1] = 0;
+      restart = true;
+    }
+  }
+  if (!d["apPass"].isNull()) {
+    String p = d["apPass"] | "";
+    if (p.length() > 32 || (p.length() > 0 && p.length() < 8)) return sendError(400, "apPass");
+    if (strcmp(p.c_str(), xt.apPass) != 0) {
+      strncpy(xt.apPass, p.c_str(), sizeof(xt.apPass) - 1);
+      xt.apPass[sizeof(xt.apPass) - 1] = 0;
+      restart = true;
+    }
+  }
+  if (d["newToken"] | false) xtNewToken();
+  if (!d["ntfOff"].isNull()) xt.ntfOff = (uint8_t)((int)(d["ntfOff"] | 0) & 63);  // [V8]
+  if (!d["amb"].isNull()) {
+    int m = d["amb"] | 0;
+    if (m < 0 || m > 4) return sendError(400, "amb");
+    xt.ambMode = m;
+    xt.lat = d["lat"] | xt.lat;
+    xt.lon = d["lon"] | xt.lon;
+    if (xt.lat < -90 || xt.lat > 90 || xt.lon < -180 || xt.lon > 180) return sendError(400, "coords");
+    ambReady = false;
+  }
+  if (!d["bday"].isNull()) {
+    JsonObject b = d["bday"];
+    xt.bdayOn = (b["on"] | 0) ? 1 : 0;
+    int ev = b["every"] | 30;
+    xt.bdayEvery = constrain(ev / 15, 1, 16);
+    JsonArray a = b["list"];
+    memset(xt.bday, 0, sizeof(xt.bday));
+    int n = 0;
+    for (JsonObject o : a) {
+      if (n >= 16) break;
+      int dd = o["d"] | 0, mm = o["m"] | 0;
+      if (dd < 1 || dd > 31 || mm < 1 || mm > 12) continue;
+      String nm = ntfClean(String((const char*)(o["n"] | "")), 12);
+      if (!nm.length()) continue;
+      xt.bday[n].used = 1;
+      xt.bday[n].d = dd;
+      xt.bday[n].m = mm;
+      xt.bday[n].kind = (o["k"] | 0) ? 1 : 0;
+      strncpy(xt.bday[n].name, nm.c_str(), 12);
+      n++;
+    }
+  }
+  writeXtConfig();
+  JsonDocument res;
+  res["ok"] = true;
+  res["restart"] = restart;
+  sendJson(200, res);
+  if (restart) {
+    delay(300);
+    ClockRestart();
+  }
+}
+
+void handleApiNotify() {
+  if (!authOrToken()) return;
+  String type = server.arg("type"), text = server.arg("text");
+  if (!text.length()) text = server.arg("msg");
+  if (!type.length() && server.arg("plain").length()) {
+    JsonDocument d;
+    if (!deserializeJson(d, server.arg("plain"))) {
+      type = d["type"] | "";
+      text = d["text"] | "";
+    }
+  }
+  type.toLowerCase();
+  if (type == "clear" || type == "callend") {
+    ntfClear = true;
+    return sendOk();
+  }
+  ntfType = type;
+  ntfText = ntfClean(text, 60);
+  ntfStamp = millis();
+  ntfPending = true;
+  sendOk();
+}
+
+void handleApiTimer() {
+  if (!authOrToken()) return;
+  long sec = 0;
+  int pomo = 0;
+  String cmd = server.arg("cmd");
+  if (server.hasArg("min")) sec = server.arg("min").toInt() * 60L;
+  if (server.hasArg("sec")) sec = server.arg("sec").toInt();
+  if (server.hasArg("pomo")) pomo = server.arg("pomo").toInt();
+  if (!cmd.length() && !sec && !pomo && server.arg("plain").length()) {
+    JsonDocument d;
+    if (!deserializeJson(d, server.arg("plain"))) {
+      cmd = d["cmd"] | "";
+      sec = (long)(d["sec"] | 0) + 60L * (long)(d["min"] | 0);
+      pomo = d["pomo"] | 0;
+    }
+  }
+  if (cmd == "stop") {
+    tmrActive = false;
+    tmrPomo = 0;
+    return sendOk();
+  }
+  if (pomo) {
+    tmrCycle = 0;
+    tmrStart(25UL * 60, 1);
+  } else if (sec >= 1 && sec <= 5940) {
+    tmrStart(sec, 0);
+  } else {
+    return sendError(400, "sec");
+  }
+  sendOk();
+}
+
+// Test buttons of the web page: {"what":"bday","i":0..15}
+void handleApiTest() {
+  if (!guardOk()) return;
+  JsonDocument d;
+  if (deserializeJson(d, server.arg("plain"))) return sendError(400, "invalid JSON");
+  String what = d["what"] | "";
+  if (what == "bday") bdayTriggerNow = d["i"] | 0;
+  else return sendError(400, "what");
+  sendOk();
+}
+
+
 void ShowTheTime() {
+  if (xtFrontTick()) return;  // [V7] notification / timer countdown
+  ambReady = false;
   // Date / temperature / humidity are each shown on their own timer (millis() based, ">=" comparison), so a screen is never
   // skipped even though every animation blocks the loop for several seconds.
   if (!autoShowInit) resetAutoShowTimers();
@@ -2338,10 +3008,12 @@ void ShowTheTime() {
     showGreeting(kind);
   }
   greetTick();
+  bdayTick();  // [V7] birthdays / special dates
   rtcTrimTick();
 
   showCurrentTime();
   showDCW();
+  if (xt.ambMode) ambSnapshot();  // [V7] ambient modes work on a copy of this picture
 }
 
 
@@ -2927,7 +3599,7 @@ void WIFI_login() {
   wifiManager.setConfigPortalBlocking(false);           // The clock keeps running while the hotspot is open
   wifiManager.setConfigPortalTimeout(AP_TIMEOUT);       // Max wait for 4 minutes
   wifiManager.setConnectTimeout(20);
-  WiFires = wifiManager.autoConnect(DEFAULT_AP_NAME);
+  WiFires = wifiManager.autoConnect(DEFAULT_AP_NAME, xt.apPass[0] ? xt.apPass : nullptr);  // [V7] optional hotspot password
   if (!WiFires) {
     portalActive = true;
     Serial.print("Failed to connect to WiFi: ");
@@ -3262,21 +3934,23 @@ void update_progress(int cur, int total) {  // Callback update download progress
 void startRestServer() {
   if (server1) return;
   server1.reset(new ESP8266WebServer(WiFi.localIP(), server1port));
-  server1->on("/", handleRoot);
-  server1->on("/ledson", ledsON);
-  server1->on("/ledsoff", ledsOFF);
+  server1->on("/", []() { if (restOk()) handleRoot(); });  // [V7] password / ?key=... once a password is set
+  server1->on("/ledson", []() { if (restOk()) ledsON(); });
+  server1->on("/ledsoff", []() { if (restOk()) ledsOFF(); });
   server1->on("/clockrestart", []() {
+    if (!restOk()) return;
     server1->send(200, "text/plain", "WORDCLOCK WILL RESTART IN 3 SECONDS...");
     delay(1000);
     ClockRestart();
   });
   server1->on("/clockwifireset", []() {
+    if (!restOk()) return;
     server1->send(200, "text/plain", "WIFI SETTING WERE SET TO DEFAULT... WORDCLOCK WILL NOW RESTART... PLEASE CONFIGURE WIFI AGAIN...");
     delay(1000);
     ClockWifiReset();
   });
-  server1->on("/ledstatus", LedStatus);
-  server1->on("/esphttpupdate", esphttpupdate);
+  server1->on("/ledstatus", []() { if (restOk()) LedStatus(); });
+  server1->on("/esphttpupdate", []() { if (restOk()) esphttpupdate(); });
   server1->begin();
 }
 
@@ -3286,8 +3960,12 @@ void startRestServer() {
 // ###########################################################################################################################################
 void startLocalUpdateServer() {
   static bool updaterReady = false;
+  if (!xt.pass[0]) {  // [V7] the local update page (port 2022) is only started when a password is set (Extras > Security)
+    Serial.println("Local update server NOT started: set a password first (web page > Extras > Security).");
+    return;
+  }
   if (!updaterReady) {
-    httpUpdater.setup(&httpServer);
+    httpUpdater.setup(&httpServer, "/update", "admin", xt.pass);
     MDNS.addService("http", "tcp", 2022);
     updaterReady = true;
   }
@@ -3317,21 +3995,34 @@ void applyUpdateMode(int mode) {
 // #   POST /api/updatecheck  look up the newest GitHub release
 // #   POST /api/update       install the release found by /api/updatecheck
 // ###########################################################################################################################################
+#define GUARD(h) ([]() { if (guardOk()) h(); })  // [V7] host / origin check + password for every page and API call
 void setupWebServer() {
-  server.on("/", HTTP_GET, handleIndex);
-  server.on("/index.html", HTTP_GET, handleIndex);
-  server.on("/api/state", HTTP_GET, handleApiState);
-  server.on("/api/config", HTTP_POST, handleApiConfig);
-  server.on("/api/restart", HTTP_POST, handleApiRestart);
-  server.on("/api/shownow", HTTP_POST, handleApiShowNow);
-  server.on("/api/emoji", HTTP_POST, handleApiEmoji);  // [V5]
-  server.on("/api/play", HTTP_POST, handleApiPlay);    // [V5]
-  server.on("/api/wifireset", HTTP_POST, handleApiWifiReset);
-  server.on("/api/cornertest", HTTP_POST, handleApiCornerTest);
-  server.on("/api/time", HTTP_POST, handleApiTime);
-  server.on("/api/updatecheck", HTTP_POST, handleApiUpdateCheck);
-  server.on("/api/update", HTTP_POST, handleApiUpdate);
-  server.on("/setWC.php", HTTP_GET, handleHiddenDCW);  // Hidden function, see handleHiddenDCW()
+  // [V7] the Origin header is needed for the origin check of POST requests ([V8 FIX] the ESP8266 core 3.x takes the names directly, the ESP32 core an array)
+#if defined(ESP32)
+  const char* hdrs[] = { "Origin" };
+  server.collectHeaders(hdrs, 1);
+#else
+  server.collectHeaders("Origin");
+#endif
+  server.on("/", HTTP_GET, GUARD(handleIndex));
+  server.on("/index.html", HTTP_GET, GUARD(handleIndex));
+  server.on("/api/state", HTTP_GET, GUARD(handleApiState));
+  server.on("/api/config", HTTP_POST, GUARD(handleApiConfig));
+  server.on("/api/restart", HTTP_POST, GUARD(handleApiRestart));
+  server.on("/api/shownow", HTTP_POST, GUARD(handleApiShowNow));
+  server.on("/api/emoji", HTTP_POST, GUARD(handleApiEmoji));  // [V5]
+  server.on("/api/play", HTTP_POST, GUARD(handleApiPlay));    // [V5]
+  server.on("/api/wifireset", HTTP_POST, GUARD(handleApiWifiReset));
+  server.on("/api/cornertest", HTTP_POST, GUARD(handleApiCornerTest));
+  server.on("/api/time", HTTP_POST, GUARD(handleApiTime));
+  server.on("/api/updatecheck", HTTP_POST, GUARD(handleApiUpdateCheck));
+  server.on("/api/update", HTTP_POST, GUARD(handleApiUpdate));
+  server.on("/setWC.php", HTTP_GET, GUARD(handleHiddenDCW));  // Hidden function, see handleHiddenDCW()
+  server.on("/api/extras", HTTP_GET, GUARD(handleApiExtrasGet));  // [V7]
+  server.on("/api/extras", HTTP_POST, GUARD(handleApiExtrasPost));
+  server.on("/api/test", HTTP_POST, GUARD(handleApiTest));
+  server.on("/api/notify", HTTP_ANY, handleApiNotify);  // [V7] own check: API key or password
+  server.on("/api/timer", HTTP_ANY, handleApiTimer);
   server.onNotFound([]() {
     server.send(404, "text/plain", "Not found");
   });
@@ -3741,7 +4432,7 @@ String cleanBootText(const char* in) {  // Boot texts: letters A-Z and spaces on
   String out = "";
   for (const char* p = in; *p && out.length() < 20; p++) {
     char ch = toupper((unsigned char)*p);
-    if ((ch >= 'A' && ch <= 'Z') || ch == ' ') out += ch;
+    if ((ch >= 'A' && ch <= 'Z') || ch == ' ' || isTextChar(ch)) out += ch;  // [V8] digits and symbols too
   }
   return out;
 }
