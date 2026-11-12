@@ -125,7 +125,7 @@ SET_LOOP_TASK_STACK_SIZE(24 * 1024);
 // ###########################################################################################################################################
 // # Version number of the code:
 // ###########################################################################################################################################
-const char* WORD_CLOCK_VERSION = "V6.2.0.1";  // [V6 CHANGE 1] was "V6.1.0.5" - ONE firmware for the standard and the big panel (web page: System > Layout). Older notes: [V5 CHANGE 4] was "V6.1.0.4" - emojis, Christmas / New Year greetings, Play tab (games). Older notes: [V4 CHANGE 5] was "V6.1.0.3" - date separator setting. Older notes:  // [V3 CHANGE 4] was "V6.1.0.2" - must be exactly the GitHub release tag. V6.1.0.3 = fix: temperature / humidity / date timers (see V3 CHANGE 1-3).
+const char* WORD_CLOCK_VERSION = "V6.2.0.4";  // [V12] ten more app icons (Signal, Outlook, X, Facebook, LinkedIn, TikTok, Snapchat, Reddit, Calendar, Zoom). Older: [V11] new app icons (WhatsApp, Telegram, Gmail redrawn; Discord, Teams, Instagram, Slack, YouTube, Spotify, Messenger added; the type may be an app name). Older: [V10 FIX] hostname number (WordClock<n>) is applied at boot before the WiFi connects and the clock restarts after changing it. Older notes: was "V6.2.0.1". [V6 CHANGE 1] was "V6.1.0.5" - ONE firmware for the standard and the big panel (web page: System > Layout). Older notes: [V5 CHANGE 4] was "V6.1.0.4" - emojis, Christmas / New Year greetings, Play tab (games). Older notes: [V4 CHANGE 5] was "V6.1.0.3" - date separator setting. Older notes:  // [V3 CHANGE 4] was "V6.1.0.2" - must be exactly the GitHub release tag. V6.1.0.3 = fix: temperature / humidity / date timers (see V3 CHANGE 1-3).
 // [FORK] previous note:  // [FORK] the release tag on GitHub must be exactly this text
 
 
@@ -645,6 +645,7 @@ void setup() {
   pixels.setPin(hw.ledPin);         // LED pin from the configuration page
   pixels.begin();                   // Init the NeoPixel library
   dunkel();                         // Switch display black
+  bootUpdateCheck();                // [V10 FIX 3] pending automatic update: install it now, while enough memory is free
   if (!useCustomMinuteOrder) setDefaultMinuteLedOrderFromSwitch();    // Set default minute corner LED order based on switchLEDOrder setting
   pixels.setBrightness(intensity);  // Set LED brightness
 #if defined(ESP32)
@@ -2408,13 +2409,32 @@ unsigned long nextAutoShow(unsigned long scheduled, int intervalSec) {
 // ###########################################################################################################################################
 
 // Notification / birthday icons: 11 columns x 10 rows (top row first), colours as in emojiColor().
-static const char ICO_WA[] PROGMEM = "...GGGGG.....GGGGGGG...GGGGGGWWG.GGGGGGWWGGGGGGGGWWGGGGGGGWWWGGGGGGGWWGGGGGGG.GWWGGGGGG...GGGGGGG...GG........";
+static const char ICO_WA[] PROGMEM = "...GGGGG.....GGGGGGG...GWWGGGGGG.GGWWWGGGGGGGGGWWWGGGGGGGGGWWWGGGGGGGGGWWWWGG.GGGGGGWWG...GGGGGGG..GG.........";
 static const char ICO_CALL1[] PROGMEM = "GGG........GGGG.......GGGG........GGG.........GGG.........GGGG.........GGGGG........GGGG......GGGGG......GGGG.";
 static const char ICO_CALL2[] PROGMEM = "GGG....Y.Y.GGGG....Y.YGGGG........GGG.........GGG.........GGGG.........GGGGG........GGGG......GGGGG......GGGG.";
 static const char ICO_SMS[] PROGMEM = ".WWWWWWWWW.WWWWWWWWWWWWWWWWWWWWWWWWBWWBWWBWWWWWWWWWWWWWWWWWWWWWWWW.WWWWWWWWW...WWW.........WW..........W......";
-static const char ICO_MAIL[] PROGMEM = "...........WWWWWWWWWWWWWBWWWWWBWWWWWBWWWBWWWWWWWBWBWWWWWWWWWBWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW...........";
-static const char ICO_TG[] PROGMEM = "...BBBBB.....BBBBBBB...BBBBBBBBB.BBBBWWWWWBBBBWWWWWWBBBBBBBWWWWBBBBBBBBWWBBBB.BBBBBWBBB...BBBBBBB.....BBBBB...";
+static const char ICO_MAIL[] PROGMEM = "...........RWWWWWWWWWRRRWWWWWWWRRRWRWWWWWRWRRWWRWWWRWWRRWWWRWRWWWRRWWWWRWWWWRRWWWWWWWWWRRWWWWWWWWWR...........";
+static const char ICO_TG[] PROGMEM = "...BBBBB.....BBBBBBB...BBBBBBBBBBBBBBBBBBWWBBBBBBBWWWBBBWWWWWWWBBBBBBBWWWWBBB.BBBBBWBBB...BBBBBBB.....BBBBB...";
 static const char ICO_BELL[] PROGMEM = ".....Y.........YYY.......YYYYY......YYYYY.....YYYYYYY....YYYYYYY...YYYYYYYYY.YYYYYYYYYYY...............OOO....";
+// [V11] more apps (Discord, Teams, Instagram, Slack, YouTube, Spotify, Messenger); extra colours: V = blurple, U / C / M see iconColor()
+static const char ICO_DC[] PROGMEM = "..VVV.VVV...VVVVVVVVV.VVVVVVVVVVVVVWWVVVWWVVVVWWVVVWWVVVVVVVVVVVVVVVVVVVVVVVV.VVVVVVVVV...VV...VV.............";
+static const char ICO_TM[] PROGMEM = ".......VVV.UUUUUUU.VV.UWWWWWWUVVVUUUWWUUUVVVUUUWWUUUVVVUUUWWUUUVVVUUUWWUUUVV.UUUWWUUU...UUUUUUUU..............";
+static const char ICO_IG[] PROGMEM = ".OOOOOOOOO.OOOOOOOOOOOOOOWWWWWOOOPPWPPPPPWPPPPWPPWPPWPPPPWPPPPPWPPMMMWWWWWMMMMMMMMMMMMMM.MMMMMMMMM............";
+static const char ICO_SL[] PROGMEM = "...B...G......B...G......B...G...BBBBBBGGGGG...B...G......R...Y...RRRRRRYYYYY...R...Y......R...Y......R...Y...";
+static const char ICO_YT[] PROGMEM = "............RRRRRRRRR.RRRWRRRRRRRRRRWWRRRRRRRRRWWWRRRRRRRRWWWRRRRRRRRWWRRRRRRRRRWRRRRRRR.RRRRRRRRR............";
+static const char ICO_SP[] PROGMEM = "...GGGGG.....GGGGGGG...GG.....GG.GG.GGGGG.GGGGGGG.GGGGGGGG.....GGGGGGGG.GGGGG.GGGGGGGGG...GGGGGGG.....GGGGG...";
+static const char ICO_MS[] PROGMEM = "...CCCCC.....CCCCCCC...CCCCCCCWC.CCCCCCCWWCCCCCCCCWWCCCCCCWWWWWWCCCCCCWWCCCCC.CCCWCCCCC...CCCCCCC....CC.......";
+// [V12] more apps: Signal, Outlook, X / Twitter, Facebook, LinkedIn, TikTok, Snapchat, Reddit, Calendar, Zoom
+static const char ICO_SG[] PROGMEM = "...FFFFF.....FFFFFFF...FFFWWWFFF.FFWWFFFWWFFFFWFFFFFWFFFFWWFFFWWFF.FFFWWWFFF...FWFFFFF....WFFFFF..............";
+static const char ICO_OL[] PROGMEM = "............FFFFFFFFF.FFWWWWWFFFFFWWFFFWWFFFFWFFFFFWFFFFWFFFFFWFFFFWWFFFWWFFFFFWWWWWFFFF.FFFFFFFFF............";
+static const char ICO_XX[] PROGMEM = "WW.......WW.WW.....WW...WW...WW.....WW.WW.......WWW........WWW.......WW.WW.....WW...WW...WW.....WW.WW.......WW";
+static const char ICO_FB[] PROGMEM = "...FFFFF.....FFFFWWWF..FFFFWFFFFFFFFFFWFFFFFFFFFWWWWFFFFFFFFWFFFFFFFFFFWFFFFF.FFFFWFFFF...FFFWFFF.....FFFFF...";
+static const char ICO_LI[] PROGMEM = ".FFFFFFFFF.FFFFFFFFFFFFFWFFFFFFFFFFFFFFFFFFFFFWFWWWWFFFFFWFWFFFWFFFFWFWFFFWFFFFWFWFFFWFF.FFFFFFFFF............";
+static const char ICO_TK[] PROGMEM = "....CWWR.......CWWWWR.....CWWR.WR....CWWR.....CWWWWR....CWWWWWWR...CWW.WWWR...CWWWWWWR....CWWWWR..............";
+static const char ICO_SC[] PROGMEM = ".YYYYYYYYY.YYYYWWWYYYYYYWWWWWWWYYYYWWWWWWWYYYYWWWWWWWYYYWWWWWWWWWYYYWWWWWWWYYYYWYWYWYWYY.YYYYYYYYY............";
+static const char ICO_RD[] PROGMEM = "...OOOOO.....OOOOOOO...OOOWWWWOOOOOWWWWWWWOOOWWOWWWOWWOOWWWWWWWWWOOOWWOOOWWOO.OOWWWWWOO...OOOOOOO.....OOOOO...";
+static const char ICO_CA[] PROGMEM = ".RRRRRRRRR.RRRRRRRRRRRWWWWWWWWWWWWWBWWBWWBWWWWWWWWWWWWWWWBWWBWWBWWWWWWWWWWWWWWWBWWBWWWWWWWWWWWWWWWW...........";
+static const char ICO_ZM[] PROGMEM = "............FFFFFFFFF.FFFFFFFFFFFFWWWWWWFFFFFWWWWWWFWWFFWWWWWWWWWFFWWWWWWFWWFFWWWWWWFFFF.FFFFFFFFF............";
 static const char ICO_CAKE[] PROGMEM = "...Y.Y.Y......W.W.W.....PPPPPPP...WWWWWWWWW..WRWRWRWRW..WWWWWWWWW..OOOOOOOOO..OOOOOOOOO..OOOOOOOOO.WWWWWWWWWWW";
 
 
@@ -2465,11 +2485,22 @@ String ntfClean(const String& in, int maxLen) {
   return out;
 }
 
+uint32_t iconColor(char c) {  // emoji colours + a few more for the app icons
+  switch (c) {
+    case 'V': return pixels.Color(88, 101, 242);   // Discord blurple
+    case 'U': return pixels.Color(110, 100, 220);  // Teams purple
+    case 'C': return pixels.Color(0, 170, 230);    // Messenger blue
+    case 'M': return pixels.Color(225, 48, 108);   // Instagram magenta
+    case 'F': return pixels.Color(24, 119, 242);   // Facebook / Signal / Outlook / LinkedIn / Zoom blue
+    default: return emojiColor(c);
+  }
+}
+
 void paintIcon(const char* p, int c0, int c1) {
   dunkel();
   for (int r = 0; r < 10; r++)
     for (int c = c0; c < c1; c++) {
-      uint32_t col = emojiColor((char)pgm_read_byte(p + r * 11 + c));
+      uint32_t col = iconColor((char)pgm_read_byte(p + r * 11 + c));
       if (col) setPx(ledXY(c, 9 - r), col);
     }
 }
@@ -2515,11 +2546,32 @@ void showNotify(const String& type, String text) {
   const char* ico = ICO_BELL;
   bool call = false;
   int bit = 5;
-  if (type == "whatsapp" || type == "wa") { ico = ICO_WA; bit = 0; }
-  else if (type == "call" || type == "phone" || type == "llamada") { ico = ICO_CALL1; call = true; bit = 1; }
-  else if (type == "sms") { ico = ICO_SMS; bit = 2; }
-  else if (type == "mail" || type == "email") { ico = ICO_MAIL; bit = 3; }
-  else if (type == "telegram") { ico = ICO_TG; bit = 4; }
+  // [V11] the type may be an app name straight from MacroDroid ("Microsoft Teams", "WhatsApp Business", ...): letters / digits only, then a keyword search
+  String k = "";
+  for (unsigned i = 0; i < type.length(); i++)
+    if (isalnum((unsigned char)type[i])) k += (char)tolower((unsigned char)type[i]);
+  if (k == "wa" || k.indexOf("whatsapp") >= 0) { ico = ICO_WA; bit = 0; }
+  else if (k.indexOf("call") >= 0 || k.indexOf("phone") >= 0 || k.indexOf("llamada") >= 0 || k.indexOf("telefono") >= 0) { ico = ICO_CALL1; call = true; bit = 1; }
+  else if (k.indexOf("sms") >= 0 || k.indexOf("mensajes") >= 0) { ico = ICO_SMS; bit = 2; }
+  else if (k.indexOf("outlook") >= 0) { ico = ICO_OL; bit = 3; }
+  else if (k.indexOf("mail") >= 0) { ico = ICO_MAIL; bit = 3; }  // Gmail logo
+  else if (k.indexOf("telegram") >= 0) { ico = ICO_TG; bit = 4; }
+  else if (k.indexOf("discord") >= 0) ico = ICO_DC;
+  else if (k.indexOf("teams") >= 0) ico = ICO_TM;
+  else if (k.indexOf("instagram") >= 0) ico = ICO_IG;
+  else if (k.indexOf("slack") >= 0) ico = ICO_SL;
+  else if (k.indexOf("youtube") >= 0) ico = ICO_YT;
+  else if (k.indexOf("spotify") >= 0) ico = ICO_SP;
+  else if (k.indexOf("messenger") >= 0) ico = ICO_MS;
+  else if (k.indexOf("signal") >= 0) ico = ICO_SG;
+  else if (k == "x" || k.indexOf("twitter") >= 0) ico = ICO_XX;
+  else if (k.indexOf("facebook") >= 0) ico = ICO_FB;
+  else if (k.indexOf("linkedin") >= 0) ico = ICO_LI;
+  else if (k.indexOf("tiktok") >= 0) ico = ICO_TK;
+  else if (k.indexOf("snapchat") >= 0) ico = ICO_SC;
+  else if (k.indexOf("reddit") >= 0) ico = ICO_RD;
+  else if (k.indexOf("calendar") >= 0 || k.indexOf("calendario") >= 0 || k.indexOf("agenda") >= 0) ico = ICO_CA;
+  else if (k.indexOf("zoom") >= 0) ico = ICO_ZM;
   if (xt.ntfOff & (1 << bit)) text = "";  // [V8] text switched off for this type (Extras tab)
   ntfClear = false;
   uint32_t col = pixels.Color(0, 200, 0);
@@ -3710,7 +3762,21 @@ void PingIP() {
 //   DEFAULT_AP_NAME opens for AP_TIMEOUT seconds. The clock keeps showing the time (from the RTC) meanwhile.
 // - Afterwards the ESP keeps trying the saved WiFi in the background. To enter new WiFi data, restart the clock.
 void WIFI_login() {
+  // [V10 FIX] The host name (WordClock<n>) has to be set BEFORE the WiFi connects, otherwise the router keeps the old / default name
+  // (all clocks showed up as "WordClock0"). If the clock already connected with another name, it reconnects with the new one.
+  String hn = wchostname + wchostnamenum;
+#if defined(ESP32)
+  WiFi.setHostname(hn.c_str());
   WiFi.mode(WIFI_STA);
+#else
+  String oldHn = WiFi.hostname();
+  WiFi.mode(WIFI_STA);
+  WiFi.hostname(hn);
+  if (WiFi.status() == WL_CONNECTED && oldHn != hn) {
+    WiFi.disconnect();
+    delay(200);
+  }
+#endif
   WiFi.setAutoReconnect(true);
   Serial.print("Try to connect to WiFi: ");
   Serial.println(WiFi.SSID());
@@ -4503,6 +4569,7 @@ void handleApiConfig() {
   useshowip = showIp ? -1 : 0;
   ntpServer = ntp;
   timeZone = tz;
+  bool hostChanged = (wchostnamenum != hostNum);  // [V10 FIX]
   wchostnamenum = hostNum;
   PING_USEMONITOR = pingOn ? 1 : 0;
   PING_DEBUG_MODE = pingDebug ? 1 : 0;
@@ -4546,8 +4613,12 @@ void handleApiConfig() {
   }
   JsonDocument res;
   res["ok"] = true;
-  res["restart"] = pinsChanged;
+  res["restart"] = pinsChanged || hostChanged;
   sendJson(200, res);
+  if (hostChanged) {  // [V10 FIX] the new host name only becomes active after a restart
+    delay(400);
+    ClockRestart();
+  }
 }
 
 String cleanBootText(const char* in) {  // Boot texts: letters A-Z and spaces only, max. 20 characters
@@ -4755,7 +4826,7 @@ String resolveDownloadUrl(String url) {
   return "";
 }
 
-void installRelease(const String& tag) {  // Download and install the update file of the release
+void installReleaseNow(const String& tag) {  // Download and install the update file of the release (called with as much free memory as possible)
   Serial.println("Update: installing release " + tag + " (" UPDATE_BIN_NAME ")");
   String url = "https://github.com/" UPDATE_REPO "/releases/download/" + tag + "/" UPDATE_BIN_NAME;
   String finalUrl = resolveDownloadUrl(url);
@@ -4769,21 +4840,7 @@ void installRelease(const String& tag) {  // Download and install the update fil
   WiFiClientSecure client;
   client.setInsecure();
 #if !defined(ESP32)
-  {  // [V10 FIX 2] ESP8266: only ~19 KB of heap are free, a full TLS input buffer (16709) does not fit -> error -1.
-    // If the download server supports "max fragment length", the input buffer can be 4096 bytes. If not, fall back to the full size.
-    String host = finalUrl.substring(8);  // after "https://"
-    int slash = host.indexOf('/');
-    if (slash > 0) host = host.substring(0, slash);
-    bool mfln = false;
-    {
-      BearSSL::WiFiClientSecure probe;
-      probe.setInsecure();
-      mfln = probe.probeMaxFragmentLength(host, 443, 4096);
-    }
-    Serial.printf("Update: server %s supports small TLS buffers: %s (free heap %u, largest block %u)\n", host.c_str(), mfln ? "yes" : "no", ESP.getFreeHeap(), (unsigned)ESP.getMaxFreeBlockSize());
-    if (mfln) client.setBufferSizes(4096, 512);
-    else client.setBufferSizes(16709, 512);
-  }
+  client.setBufferSizes(16709, 512);  // [V10 FIX] ESP8266: full TLS input record (the server does not support smaller ones), small output buffer
 #endif
   ESPhttpUpdate.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);  // already resolved above
   ESPhttpUpdate.onStart(update_started);
@@ -4803,6 +4860,57 @@ void installRelease(const String& tag) {  // Download and install the update fil
       Serial.println("HTTP_UPDATE_OK");
       break;
   }
+}
+
+
+// [V10 FIX 3] ESP8266: during normal operation only ~27 KB of heap are free, not enough for the TLS download (error -1).
+// So the update is done right after a restart: the version is remembered in the RTC memory (survives the restart), the clock restarts,
+// and bootUpdateCheck() (called early in setup(), before the web server etc. are started) connects to the WiFi and installs it.
+struct PendingUpdate {
+  uint32_t magic;
+  char tag[24];
+};
+const uint32_t PENDING_UPDATE_MAGIC = 0x57435550;  // "WCUP"
+
+void installRelease(const String& tag) {
+#if defined(ESP32)
+  installReleaseNow(tag);
+#else
+  PendingUpdate pu;
+  pu.magic = PENDING_UPDATE_MAGIC;
+  memset(pu.tag, 0, sizeof(pu.tag));
+  strlcpy(pu.tag, tag.c_str(), sizeof(pu.tag));
+  ESP.rtcUserMemoryWrite(0, (uint32_t*)&pu, sizeof(pu));
+  Serial.println("Update: restarting to install " + tag + " with free memory...");
+  delay(500);
+  ESP.restart();
+#endif
+}
+
+void bootUpdateCheck() {  // called from setup() right after the LEDs are initialised
+#if !defined(ESP32)
+  PendingUpdate pu;
+  if (!ESP.rtcUserMemoryRead(0, (uint32_t*)&pu, sizeof(pu))) return;
+  if (pu.magic != PENDING_UPDATE_MAGIC) return;
+  pu.magic = 0;  // clear first, so a failed update can never end in a restart loop
+  ESP.rtcUserMemoryWrite(0, (uint32_t*)&pu, sizeof(pu));
+  pu.tag[sizeof(pu.tag) - 1] = 0;
+  String tag = String(pu.tag);
+  Serial.println("Update: boot update of " + tag + ", connecting to the WiFi...");
+  WiFi.mode(WIFI_STA);
+  WiFi.begin();  // saved WiFi credentials
+  unsigned long t0 = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - t0 < 20000) {
+    delay(250);
+    ESP_WDT_FEED();
+  }
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("Update: no WiFi, update cancelled");
+    return;
+  }
+  Serial.printf("Update: WiFi connected, free heap %u, largest block %u\n", ESP.getFreeHeap(), (unsigned)ESP.getMaxFreeBlockSize());
+  installReleaseNow(tag);
+#endif
 }
 
 
