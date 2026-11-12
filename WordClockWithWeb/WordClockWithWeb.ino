@@ -10,6 +10,10 @@
 // ###########################################################################################################################################
 // # [FORK] Layout version (10 x 11 panel) with the improvements of the fork V6.1.0.2 merged in. Own version numbers have 4 parts
 // #   (V6.1.0.1, V6.1.0.2, ...), see parseVersion() / compareVersions(). Update source: UPDATE_REPO in settings.h.
+// # [FORK] V6.2.0.5 (marked "[V13 CHANGE n]"):
+// #   1. Notifications: the scrolling text (name / number) can now be switched on / off for EVERY app (WhatsApp, call, SMS, mail, Telegram, bell, Outlook, Discord,
+// #      Teams, Instagram, Slack, YouTube, Spotify, Messenger, Signal, X, Facebook, LinkedIn, TikTok, Snapchat, Reddit, Calendar, Zoom): tab "Extras".
+// #      Before, only the first 6 types had a switch and every other app followed the "bell" switch. The bit numbers of the first 6 types are unchanged.
 // # [FORK] V6.1.0.9: FIX of the automatic update (error -104): the GitHub download redirect is now followed by hand in resolveDownloadUrl(),
 // #   the HTTP code of every hop is printed on the serial monitor. Nothing else changed.
 // # [FORK] V6.1.0.8 (marked "[V8 CHANGE n]"):
@@ -125,7 +129,7 @@ SET_LOOP_TASK_STACK_SIZE(24 * 1024);
 // ###########################################################################################################################################
 // # Version number of the code:
 // ###########################################################################################################################################
-const char* WORD_CLOCK_VERSION = "V6.2.0.4";  // [V12] ten more app icons (Signal, Outlook, X, Facebook, LinkedIn, TikTok, Snapchat, Reddit, Calendar, Zoom). Older: [V11] new app icons (WhatsApp, Telegram, Gmail redrawn; Discord, Teams, Instagram, Slack, YouTube, Spotify, Messenger added; the type may be an app name). Older: [V10 FIX] hostname number (WordClock<n>) is applied at boot before the WiFi connects and the clock restarts after changing it. Older notes: was "V6.2.0.1". [V6 CHANGE 1] was "V6.1.0.5" - ONE firmware for the standard and the big panel (web page: System > Layout). Older notes: [V5 CHANGE 4] was "V6.1.0.4" - emojis, Christmas / New Year greetings, Play tab (games). Older notes: [V4 CHANGE 5] was "V6.1.0.3" - date separator setting. Older notes:  // [V3 CHANGE 4] was "V6.1.0.2" - must be exactly the GitHub release tag. V6.1.0.3 = fix: temperature / humidity / date timers (see V3 CHANGE 1-3).
+const char* WORD_CLOCK_VERSION = "V6.2.0.5";  // [V13] the text (name / number) of a notification can be switched on / off for EVERY app (23 types, was 6), see xtRec.ntfOff32 and showNotify(). Older: [V12] ten more app icons (Signal, Outlook, X, Facebook, LinkedIn, TikTok, Snapchat, Reddit, Calendar, Zoom). Older: [V11] new app icons (WhatsApp, Telegram, Gmail redrawn; Discord, Teams, Instagram, Slack, YouTube, Spotify, Messenger added; the type may be an app name). Older: [V10 FIX] hostname number (WordClock<n>) is applied at boot before the WiFi connects and the clock restarts after changing it. Older notes: was "V6.2.0.1". [V6 CHANGE 1] was "V6.1.0.5" - ONE firmware for the standard and the big panel (web page: System > Layout). Older notes: [V5 CHANGE 4] was "V6.1.0.4" - emojis, Christmas / New Year greetings, Play tab (games). Older notes: [V4 CHANGE 5] was "V6.1.0.3" - date separator setting. Older notes:  // [V3 CHANGE 4] was "V6.1.0.2" - must be exactly the GitHub release tag. V6.1.0.3 = fix: temperature / humidity / date timers (see V3 CHANGE 1-3).
 // [FORK] previous note:  // [FORK] the release tag on GitHub must be exactly this text
 
 
@@ -388,7 +392,13 @@ struct xtRec {
   float lat, lon;
   bdayRec bday[16];
   uint8_t pomoWork, pomoBrk, pomoLng, xtPad;  // [V9] pomodoro minutes: work / short break / long break (appended at the END, old records stay valid)
+  // [V13 CHANGE 1] text switch for every app: bit set = no text. Bits 0-5 as ntfOff (0 WhatsApp, 1 call, 2 SMS, 3 mail, 4 Telegram, 5 bell), then
+  //   6 Outlook, 7 Discord, 8 Teams, 9 Instagram, 10 Slack, 11 YouTube, 12 Spotify, 13 Messenger, 14 Signal, 15 X, 16 Facebook, 17 LinkedIn,
+  //   18 TikTok, 19 Snapchat, 20 Reddit, 21 Calendar, 22 Zoom. Appended at the END; ntfOk == 0xA5 marks that the field was written by this version.
+  uint32_t ntfOff32;
+  uint8_t ntfOk;
 } xt;
+#define NTF_OK 0xA5  // [V13 CHANGE 1] marker of a valid xt.ntfOff32
 #define XT_MAGIC 0x57435831UL  // "WCX1"
 #define XT_OFFSET (LAY_OFFSET + ((sizeof(layRec) + 3) / 4) * 4)
 #define EEPROM_SIZE (XT_OFFSET + sizeof(xtRec))
@@ -414,6 +424,8 @@ void xtDefaults() {
   xt.pomoWork = 25;
   xt.pomoBrk = 5;
   xt.pomoLng = 15;
+  xt.ntfOff32 = 0;  // [V13 CHANGE 1] all texts on
+  xt.ntfOk = NTF_OK;
   xtNewToken();
 }
 
@@ -921,6 +933,12 @@ void readEEPROM() {
   if (xt.pomoWork < 1 || xt.pomoWork > 99) xt.pomoWork = 25;
   if (xt.pomoBrk < 1 || xt.pomoBrk > 99) xt.pomoBrk = 5;
   if (xt.pomoLng < 1 || xt.pomoLng > 99) xt.pomoLng = 15;
+  // [V13 CHANGE 1] an old record has garbage behind the pomodoro bytes: take over the 6 old switches (ntfOff) and set the marker
+  if (xt.ntfOk != NTF_OK || xt.ntfOff32 > 0x7FFFFFUL) {
+    xt.ntfOff32 = xt.ntfOff & 63;
+    xt.ntfOk = NTF_OK;
+    writeXtConfig();
+  }
 }
 
 
@@ -2553,26 +2571,26 @@ void showNotify(const String& type, String text) {
   if (k == "wa" || k.indexOf("whatsapp") >= 0) { ico = ICO_WA; bit = 0; }
   else if (k.indexOf("call") >= 0 || k.indexOf("phone") >= 0 || k.indexOf("llamada") >= 0 || k.indexOf("telefono") >= 0) { ico = ICO_CALL1; call = true; bit = 1; }
   else if (k.indexOf("sms") >= 0 || k.indexOf("mensajes") >= 0) { ico = ICO_SMS; bit = 2; }
-  else if (k.indexOf("outlook") >= 0) { ico = ICO_OL; bit = 3; }
+  else if (k.indexOf("outlook") >= 0) { ico = ICO_OL; bit = 6; }  // [V13 CHANGE 1] own bit (was 3 = mail)
   else if (k.indexOf("mail") >= 0) { ico = ICO_MAIL; bit = 3; }  // Gmail logo
   else if (k.indexOf("telegram") >= 0) { ico = ICO_TG; bit = 4; }
-  else if (k.indexOf("discord") >= 0) ico = ICO_DC;
-  else if (k.indexOf("teams") >= 0) ico = ICO_TM;
-  else if (k.indexOf("instagram") >= 0) ico = ICO_IG;
-  else if (k.indexOf("slack") >= 0) ico = ICO_SL;
-  else if (k.indexOf("youtube") >= 0) ico = ICO_YT;
-  else if (k.indexOf("spotify") >= 0) ico = ICO_SP;
-  else if (k.indexOf("messenger") >= 0) ico = ICO_MS;
-  else if (k.indexOf("signal") >= 0) ico = ICO_SG;
-  else if (k == "x" || k.indexOf("twitter") >= 0) ico = ICO_XX;
-  else if (k.indexOf("facebook") >= 0) ico = ICO_FB;
-  else if (k.indexOf("linkedin") >= 0) ico = ICO_LI;
-  else if (k.indexOf("tiktok") >= 0) ico = ICO_TK;
-  else if (k.indexOf("snapchat") >= 0) ico = ICO_SC;
-  else if (k.indexOf("reddit") >= 0) ico = ICO_RD;
-  else if (k.indexOf("calendar") >= 0 || k.indexOf("calendario") >= 0 || k.indexOf("agenda") >= 0) ico = ICO_CA;
-  else if (k.indexOf("zoom") >= 0) ico = ICO_ZM;
-  if (xt.ntfOff & (1 << bit)) text = "";  // [V8] text switched off for this type (Extras tab)
+  else if (k.indexOf("discord") >= 0) { ico = ICO_DC; bit = 7; }
+  else if (k.indexOf("teams") >= 0) { ico = ICO_TM; bit = 8; }
+  else if (k.indexOf("instagram") >= 0) { ico = ICO_IG; bit = 9; }
+  else if (k.indexOf("slack") >= 0) { ico = ICO_SL; bit = 10; }
+  else if (k.indexOf("youtube") >= 0) { ico = ICO_YT; bit = 11; }
+  else if (k.indexOf("spotify") >= 0) { ico = ICO_SP; bit = 12; }
+  else if (k.indexOf("messenger") >= 0) { ico = ICO_MS; bit = 13; }
+  else if (k.indexOf("signal") >= 0) { ico = ICO_SG; bit = 14; }
+  else if (k == "x" || k.indexOf("twitter") >= 0) { ico = ICO_XX; bit = 15; }
+  else if (k.indexOf("facebook") >= 0) { ico = ICO_FB; bit = 16; }
+  else if (k.indexOf("linkedin") >= 0) { ico = ICO_LI; bit = 17; }
+  else if (k.indexOf("tiktok") >= 0) { ico = ICO_TK; bit = 18; }
+  else if (k.indexOf("snapchat") >= 0) { ico = ICO_SC; bit = 19; }
+  else if (k.indexOf("reddit") >= 0) { ico = ICO_RD; bit = 20; }
+  else if (k.indexOf("calendar") >= 0 || k.indexOf("calendario") >= 0 || k.indexOf("agenda") >= 0) { ico = ICO_CA; bit = 21; }
+  else if (k.indexOf("zoom") >= 0) { ico = ICO_ZM; bit = 22; }
+  if (xt.ntfOff32 & (1UL << bit)) text = "";  // [V8] text switched off for this type (Extras tab); [V13 CHANGE 1] 32-bit mask, a bit for every app
   ntfClear = false;
   uint32_t col = pixels.Color(0, 200, 0);
   if (call) {  // the phone rings until "clear" / "callend", until a new notification arrives or for 45 s at most
@@ -2975,7 +2993,7 @@ void handleApiExtrasGet() {
   d["amb"] = xt.ambMode;
   d["bdayOn"] = xt.bdayOn;
   d["bdayEvery"] = xt.bdayEvery * 15;
-  d["ntfOff"] = xt.ntfOff;
+  d["ntfOff"] = (uint32_t)xt.ntfOff32;  // [V13 CHANGE 1] was xt.ntfOff (6 bits)
   d["tmr"] = tmrActive ? (int)max(0L, (long)(tmrEnd - millis()) / 1000L) : 0;
   d["pomo"]["work"] = xt.pomoWork;
   d["pomo"]["brk"] = xt.pomoBrk;
@@ -3008,7 +3026,11 @@ void handleApiExtrasPost() {
     }
   }
   if (d["newToken"] | false) xtNewToken();
-  if (!d["ntfOff"].isNull()) xt.ntfOff = (uint8_t)((int)(d["ntfOff"] | 0) & 63);  // [V8]
+  if (!d["ntfOff"].isNull()) {  // [V8]; [V13 CHANGE 1] 23 bits (one per app); ntfOff keeps the first 6 for compatibility
+    xt.ntfOff32 = (uint32_t)((long)(d["ntfOff"] | 0) & 0x7FFFFF);
+    xt.ntfOff = (uint8_t)(xt.ntfOff32 & 63);
+    xt.ntfOk = NTF_OK;
+  }
   if (!d["amb"].isNull()) {
     int m = d["amb"] | 0;
     if (m < 0 || m > 9) return sendError(400, "amb");

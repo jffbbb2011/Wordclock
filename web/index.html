@@ -7,6 +7,8 @@
 <link rel="icon" href="data:,">
 <title>WordClock Einstellungen</title>
 <!--
+  [V13 CHANGE 1] Tab Extras > notifications: the test buttons, the hint (3 languages) and the checkboxes "show name / number as scrolling text" now list ALL apps
+  the firmware knows (NTF_KINDS, same order as the bits of xt.ntfOff32 in the firmware). Before: only the 6 basic types.
   [V6] ONE PAGE FOR ALL PANELS: System > Layout selects the standard or the big panel (letters of the preview, LED numbers of the words,
   option VIERTEL / DREIVIERTEL only on the standard panel), the row mirroring and the current limit. Greetings moved to the tab "Lauftexte".
   [V2] CHANGES compared to the original web/index.html:
@@ -900,7 +902,7 @@ const T = {
     ambLat: "Breitengrad",
     ambLon: "Längengrad",
     gNtf: "Benachrichtigungen (MacroDroid)",
-    ntfHint: "MacroDroid: Aktion „HTTP-Anfrage“ (GET) an die URL unten. Typ: whatsapp, call, sms, mail, telegram, bell. Mit &text=NAME läuft ein Text. type=clear beendet den Anruf.",
+    ntfHint: "MacroDroid: Aktion „HTTP-Anfrage“ (GET) an die URL unten. Typ: whatsapp, call, sms, mail, telegram, bell, outlook, discord, teams, instagram, slack, youtube, spotify, messenger, signal, x, facebook, linkedin, tiktok, snapchat, reddit, calendar, zoom (auch der App-Name aus MacroDroid geht). Mit &text=NAME läuft ein Text. type=clear beendet den Anruf.",
     ntfKey: "API-Schlüssel",
     ntfNew: "Neu erzeugen",
     ntfUrlSub: "Beispiel",
@@ -1127,7 +1129,7 @@ const T = {
     ambLat: "Latitude",
     ambLon: "Longitude",
     gNtf: "Notifications (MacroDroid)",
-    ntfHint: "MacroDroid: action “HTTP request” (GET) to the URL below. Type: whatsapp, call, sms, mail, telegram, bell. Add &text=NAME to scroll a text. type=clear ends the call.",
+    ntfHint: "MacroDroid: action “HTTP request” (GET) to the URL below. Type: whatsapp, call, sms, mail, telegram, bell, outlook, discord, teams, instagram, slack, youtube, spotify, messenger, signal, x, facebook, linkedin, tiktok, snapchat, reddit, calendar, zoom (the app name from MacroDroid works too). Add &text=NAME to scroll a text. type=clear ends the call.",
     ntfKey: "API key",
     ntfNew: "Regenerate",
     ntfUrlSub: "Example",
@@ -1354,7 +1356,7 @@ const T = {
     ambLat: "Latitud",
     ambLon: "Longitud",
     gNtf: "Avisos (MacroDroid)",
-    ntfHint: "MacroDroid: acción «Petición HTTP» (GET) a la URL de abajo. Tipo: whatsapp, call, sms, mail, telegram, bell. Con &text=NOMBRE se desplaza un texto. type=clear termina la llamada.",
+    ntfHint: "MacroDroid: acción «Petición HTTP» (GET) a la URL de abajo. Tipo: whatsapp, call, sms, mail, telegram, bell, outlook, discord, teams, instagram, slack, youtube, spotify, messenger, signal, x, facebook, linkedin, tiktok, snapchat, reddit, calendar, zoom (también vale el nombre de la app desde MacroDroid). Con &text=NOMBRE se desplaza un texto. type=clear termina la llamada.",
     ntfKey: "Clave API",
     ntfNew: "Regenerar",
     ntfUrlSub: "Ejemplo",
@@ -2171,7 +2173,8 @@ async function xLoad() {
   xRenderList(); xRenderNtf(); xRenderNtfTxt();
 }
 function xRenderNtf() {
-  const kinds = ["whatsapp", "call", "sms", "mail", "telegram", "bell"];
+  // [V13 CHANGE 1] was only the 6 basic types. Now ALL apps that showNotify() in the firmware recognises (list NTF_KINDS below).
+  const kinds = NTF_KINDS;
   $("#xNtfBtns").innerHTML = kinds.map(k => `<button type="button" class="btn sm" data-ntf="${k}">${k}</button>`).join("") + `<button type="button" class="btn sm ghost" data-ntf="clear">clear</button>`;
 }
 function xRenderList() {
@@ -2187,7 +2190,10 @@ async function xPost(body, quiet) {
 }
 
 // [V8] ntfOff checkboxes (text per notification type) and emoji import
-const NTF_KINDS = ["whatsapp", "call", "sms", "mail", "telegram", "bell"];
+// [V13 CHANGE 1] ALL apps. The ORDER = bit number in the firmware (xt.ntfOff32): 0-5 as before, then 6 outlook ... 22 zoom. Do not reorder.
+const NTF_KINDS = ["whatsapp", "call", "sms", "mail", "telegram", "bell",
+  "outlook", "discord", "teams", "instagram", "slack", "youtube", "spotify", "messenger", "signal",
+  "x", "facebook", "linkedin", "tiktok", "snapchat", "reddit", "calendar", "zoom"];
 function xRenderNtfTxt() {
   const off = (X.d && X.d.ntfOff) || 0;
   $("#xNtfTxt").innerHTML = NTF_KINDS.map((k, i) => `<label class="btn sm" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" data-nt="${i}"${off & (1 << i) ? "" : " checked"}>${k}</label>`).join("");
