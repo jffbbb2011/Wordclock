@@ -10,6 +10,9 @@
 // ###########################################################################################################################################
 // # [FORK] Layout version (10 x 11 panel) with the improvements of the fork V6.1.0.2 merged in. Own version numbers have 4 parts
 // #   (V6.1.0.1, V6.1.0.2, ...), see parseVersion() / compareVersions(). Update source: UPDATE_REPO in settings.h.
+// # [FORK] V6.2.0.7 (marked "[V15 CHANGE n]"):
+// #   1. Ambient mode: the effect (fire, aurora, ...) now also colours the scrolling texts (date, temperature, humidity, own interval text, boot text).
+// #      Before, the effects only worked on the time picture, so every text was shown in the single colour. Other modes were not affected.
 // # [FORK] V6.2.0.6 (marked "[V14 CHANGE n]"):
 // #   1. The 2nd boot text is now an INTERVAL TEXT (web tab Display: on/off, interval 30 s - 1 h, speed), like date / temperature / humidity. Only text 1 is still shown at startup.
 // #   2. Rainbow mode has 2 variants: every WORD or every LETTER in its own colour (xt.rbSub).
@@ -134,7 +137,7 @@ SET_LOOP_TASK_STACK_SIZE(24 * 1024);
 // ###########################################################################################################################################
 // # Version number of the code:
 // ###########################################################################################################################################
-const char* WORD_CLOCK_VERSION = "V6.2.0.6";  // [V14] interval text (boot text 2), rainbow per word / per letter, random colour interval, ambient mode in the colour mode. Older: [V13] the text (name / number) of a notification can be switched on / off for EVERY app (23 types, was 6), see xtRec.ntfOff32 and showNotify(). Older: [V12] ten more app icons (Signal, Outlook, X, Facebook, LinkedIn, TikTok, Snapchat, Reddit, Calendar, Zoom). Older: [V11] new app icons (WhatsApp, Telegram, Gmail redrawn; Discord, Teams, Instagram, Slack, YouTube, Spotify, Messenger added; the type may be an app name). Older: [V10 FIX] hostname number (WordClock<n>) is applied at boot before the WiFi connects and the clock restarts after changing it. Older notes: was "V6.2.0.1". [V6 CHANGE 1] was "V6.1.0.5" - ONE firmware for the standard and the big panel (web page: System > Layout). Older notes: [V5 CHANGE 4] was "V6.1.0.4" - emojis, Christmas / New Year greetings, Play tab (games). Older notes: [V4 CHANGE 5] was "V6.1.0.3" - date separator setting. Older notes:  // [V3 CHANGE 4] was "V6.1.0.2" - must be exactly the GitHub release tag. V6.1.0.3 = fix: temperature / humidity / date timers (see V3 CHANGE 1-3).
+const char* WORD_CLOCK_VERSION = "V6.2.0.7";  // [V15] the ambient effect also runs on the scrolling texts (date, temperature, humidity, own text, boot text). Older: [V14] interval text (boot text 2), rainbow per word / per letter, random colour interval, ambient mode in the colour mode. Older: [V13] the text (name / number) of a notification can be switched on / off for EVERY app (23 types, was 6), see xtRec.ntfOff32 and showNotify(). Older: [V12] ten more app icons (Signal, Outlook, X, Facebook, LinkedIn, TikTok, Snapchat, Reddit, Calendar, Zoom). Older: [V11] new app icons (WhatsApp, Telegram, Gmail redrawn; Discord, Teams, Instagram, Slack, YouTube, Spotify, Messenger added; the type may be an app name). Older: [V10 FIX] hostname number (WordClock<n>) is applied at boot before the WiFi connects and the clock restarts after changing it. Older notes: was "V6.2.0.1". [V6 CHANGE 1] was "V6.1.0.5" - ONE firmware for the standard and the big panel (web page: System > Layout). Older notes: [V5 CHANGE 4] was "V6.1.0.4" - emojis, Christmas / New Year greetings, Play tab (games). Older notes: [V4 CHANGE 5] was "V6.1.0.3" - date separator setting. Older notes:  // [V3 CHANGE 4] was "V6.1.0.2" - must be exactly the GitHub release tag. V6.1.0.3 = fix: temperature / humidity / date timers (see V3 CHANGE 1-3).
 // [FORK] previous note:  // [FORK] the release tag on GitHub must be exactly this text
 
 
@@ -174,7 +177,16 @@ inline void setPx(int i, uint8_t r, uint8_t g, uint8_t b) {
 // [V6 CHANGE 2] maxCurrentMA (see above) replaces the old #define MAX_LED_CURRENT_MA.
 
 // [V2 CHANGE 4] showLimited() replaces every pixels.show() call in this file (the limit is applied in ONE place).
+// [V15 CHANGE 1] ambText = a scrolling text is being drawn: showLimited() lets the ambient effect colour this frame (ambTextHook(), defined with the other ambient code).
+bool ambText = false;
+void ambTextHook();
+struct AmbTextScope {  // set at the start of a text function, cleared automatically when it ends (also at an early return)
+  AmbTextScope() { ambText = true; }
+  ~AmbTextScope() { ambText = false; }
+};
+
 void showLimited() {
+  ambTextHook();  // [V15 CHANGE 1] only does something while a scrolling text runs in ambient mode
   if (maxCurrentMA > 0) {
   uint8_t *buf = pixels.getPixels();
   const int numBytes = NUMPIXELS * 3;
@@ -1476,6 +1488,7 @@ void showScrollText(const char* text) {
 // # Shows the two configurable scrolling boot texts (bootText1 and bootText2 - settable on the web configuration page) once at startup:
 // ###########################################################################################################################################
 void showBootTexts() {
+  AmbTextScope ambScope;  // [V15 CHANGE 1] ambient effect on this text
   if (!useBootText) return;
 
   if (bootText1.length() > 0) {
@@ -1771,6 +1784,7 @@ void txtShowValue(int style, int speed, const char* numScroll, const char* numIn
 // # Show current date on clock:
 // ###########################################################################################################################################
 void showCurrentDate() {
+  AmbTextScope ambScope;  // [V15 CHANGE 1] ambient effect on this text
   int year = iYear;
   if (year < 1000) year += 2000;
   int style = txt.dateStyle;
@@ -1803,6 +1817,7 @@ void showCurrentDate() {
 // [V3 CHANGE 1] Now returns bool (true = value was shown, false = sensor not ready / faulty reading) so that ShowTheTime() can retry
 // after a few seconds instead of losing the whole interval (before: a failed read meant no temperature for 5 min, 1 h, ...).
 bool showCurrentTemp() {
+  AmbTextScope ambScope;  // [V15 CHANGE 1] ambient effect on this text
   if (!checkHTU()) return false;  // Sensor not available
 
   float t = htu.readTemperature();
@@ -1827,6 +1842,7 @@ bool showCurrentTemp() {
 // # Show current humidity on clock - reads the GY-21 / HTU21D sensor once before showing:
 // ###########################################################################################################################################
 bool showCurrentHumidity() {  // [V3 CHANGE 1] returns bool, see showCurrentTemp()
+  AmbTextScope ambScope;  // [V15 CHANGE 1] ambient effect on this text
   if (!checkHTU()) return false;  // Sensor not available
 
   float h = htu.readHumidity();
@@ -2435,6 +2451,7 @@ bool autoShowInit = false;
 
 // [V14 CHANGE 1] The interval text = bootText2 (max. 20 characters), scrolled with its own speed.
 void showCustomText() {
+  AmbTextScope ambScope;  // [V15 CHANGE 1] ambient effect on this text
   if (bootText2.length() == 0) return;
   String t = bootText2;
   t.toUpperCase();  // font only supports uppercase letters
@@ -2861,12 +2878,9 @@ static void ambHsv(uint16_t hue, float l, float& r, float& g, float& bl) {
 
 // Called every ~5 ms from serviceDelay(): re-colours the lit LEDs of the last picture (buffer order of NEO_GRB: byte 0 = G, 1 = R, 2 = B).
 // All effects are calculated from millis(), so they run smoothly although the clock picture is rebuilt about every 2 seconds.
-void ambientTick() {
-  if (!xt.ambMode || !ambReady || playActive || !LEDsON || !RESTmanLEDsON) return;
+// [V15 CHANGE 1] The effect itself (formerly the body of ambientTick()): re-colours the lit LEDs of ambBase into the pixel buffer, WITHOUT sending it.
+static void ambRender() {
   unsigned long now = millis();
-  unsigned long gap = (xt.ambMode == 4) ? 500UL : (xt.ambMode == 3) ? 30UL : (xt.ambMode == 1 || xt.ambMode == 6) ? 70UL : 45UL;
-  if (now - ambLastMs < gap) return;
-  ambLastMs = now;
   uint8_t* b = pixels.getPixels();
   float t = now / 1000.0f;
   float day = (xt.ambMode == 4) ? sunDayness() : 1.0f;
@@ -2929,7 +2943,24 @@ void ambientTick() {
     b[i * 3 + 1] = (uint8_t)min(max(r, 0.0f), 255.0f);
     b[i * 3 + 2] = (uint8_t)min(max(bl, 0.0f), 255.0f);
   }
+}
+
+void ambientTick() {
+  if (!xt.ambMode || !ambReady || playActive || !LEDsON || !RESTmanLEDsON) return;
+  unsigned long now = millis();
+  unsigned long gap = (xt.ambMode == 4) ? 500UL : (xt.ambMode == 3) ? 30UL : (xt.ambMode == 1 || xt.ambMode == 6) ? 70UL : 45UL;
+  if (now - ambLastMs < gap) return;
+  ambLastMs = now;
+  ambRender();
   showLimited();
+}
+
+// [V15 CHANGE 1] Called at the start of showLimited(): while a scrolling text is drawn, the frame is taken as the base picture (like ambSnapshot(), but
+// WITHOUT setting ambReady, so the clock picture logic is not touched) and the ambient effect is applied to it before it is sent.
+void ambTextHook() {
+  if (!ambText || !xt.ambMode || playActive || !LEDsON || !RESTmanLEDsON) return;
+  memcpy(ambBase, pixels.getPixels(), NUMPIXELS * 3);
+  ambRender();
 }
 
 // Called at the start of ShowTheTime(): pending notification, running timer. true = the timer shows its countdown, skip the clock.
