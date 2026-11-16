@@ -7,6 +7,10 @@
 <link rel="icon" href="data:,">
 <title>WordClock Einstellungen</title>
 <!--
+  [V14 CHANGE 1] Tab Display: boot text 2 is now an INTERVAL TEXT (on/off, interval, speed) in the group "Anzeigen als Lauftext"; at startup only text 1 runs.
+  [V14 CHANGE 2] Tab LEDs: ONE colour mode selector with 4 modes (single / rainbow / random / ambient). Rainbow: per word or per letter (cfg.rbSub);
+  random: how often the colour changes (cfg.rndEvery); ambient: effect list moved here from tab Extras (cfg.amb). The colour picker only shows where it is used.
+  [V14 CHANGE 3] Preview: rainbow per letter and animated ambient effects (port of ambientTick() of the firmware, runs in the browser only).
   [V13 CHANGE 1] Tab Extras > notifications: the test buttons, the hint (3 languages) and the checkboxes "show name / number as scrolling text" now list ALL apps
   the firmware knows (NTF_KINDS, same order as the bits of xt.ntfOff32 in the firmware). Before: only the 6 basic types.
   [V6] ONE PAGE FOR ALL PANELS: System > Layout selects the standard or the big panel (letters of the preview, LED numbers of the words,
@@ -320,22 +324,36 @@ canvas.playcv{cursor:pointer}
         <!-- LEDs -->
         <section class="panel" id="p-led" role="tabpanel" aria-labelledby="t-led">
           <div class="group">
+            <h3 data-t="gMode">Farbmodus</h3>
+            <div class="seg" role="radiogroup">
+              <input type="radio" name="cmode" id="cm0" value="0"><label for="cm0" data-t="rb0">Einfarbig</label>
+              <input type="radio" name="cmode" id="cm1" value="1"><label for="cm1" data-t="rb1">Regenbogen</label>
+              <input type="radio" name="cmode" id="cm2" value="2"><label for="cm2" data-t="rb2">Zufällig</label>
+              <input type="radio" name="cmode" id="cm3" value="3"><label for="cm3" data-t="rb3">Ambiente</label>
+            </div><!-- [V14 CHANGE 2] one selector: cm0..cm2 = cfg.rainbow 0..2, cm3 = ambient (cfg.amb > 0) -->
+            <p class="hint" id="rbHint"></p>
+            <div id="optRainbow" hidden>
+              <div class="seg" role="radiogroup">
+                <input type="radio" name="rbSub" id="rbs0" value="0" data-k="rbSub"><label for="rbs0" data-t="rbs0"></label>
+                <input type="radio" name="rbSub" id="rbs1" value="1" data-k="rbSub"><label for="rbs1" data-t="rbs1"></label>
+              </div>
+            </div>
+            <div id="optRandom" hidden>
+              <div class="rows"><div class="row"><span class="rt"><b data-t="gRnd"></b></span><select id="rndEvery" data-k="rndEvery" data-type="num"><option value="0" data-t="rnd0"></option><option value="1" data-t="rnd1"></option><option value="2" data-t="rnd2"></option><option value="3" data-t="rnd3"></option></select></div></div>
+            </div>
+            <div id="optAmb" hidden>
+              <p class="hint" data-t="ambHint"></p>
+              <div class="rows"><div class="row"><span class="rt"><b data-t="gAmbSel"></b></span><select id="amb" data-k="amb" data-type="num"><option value="1" data-t="amb1"></option><option value="2" data-t="amb2"></option><option value="3" data-t="amb3"></option><option value="4" data-t="amb4"></option><option value="5" data-t="amb5"></option><option value="6" data-t="amb6"></option><option value="7" data-t="amb7"></option><option value="8" data-t="amb8"></option><option value="9" data-t="amb9"></option></select></div></div>
+            </div>
+          </div>
+          <div class="group" id="colorGroup">
             <div class="ghead"><h3 data-t="gColor">Farbe</h3></div>
             <div class="colorrow">
               <input type="color" id="color" data-k="color" aria-label="Farbe">
               <input type="text" id="colorHex" class="mono" maxlength="7" spellcheck="false" aria-label="Hex">
               <div class="swatches" id="swatches"></div>
             </div>
-            <p class="hint" data-t="gColorHint">Gilt, solange der Farbmodus „Einfarbig“ ist.</p>
-          </div>
-          <div class="group">
-            <h3 data-t="gMode">Farbmodus</h3>
-            <div class="seg" role="radiogroup">
-              <input type="radio" name="rainbow" id="rb0" value="0" data-k="rainbow"><label for="rb0" data-t="rb0">Einfarbig</label>
-              <input type="radio" name="rainbow" id="rb1" value="1" data-k="rainbow"><label for="rb1" data-t="rb1">Regenbogen</label>
-              <input type="radio" name="rainbow" id="rb2" value="2" data-k="rainbow"><label for="rb2" data-t="rb2">Zufällig</label>
-            </div>
-            <p class="hint" id="rbHint"></p>
+            <p class="hint" id="colorHint" hidden></p>
           </div>
           <div class="group">
             <h3 data-t="gBright">Helligkeit</h3>
@@ -400,6 +418,13 @@ canvas.playcv{cursor:pointer}
               <div class="row"><span class="rt"><b data-t="interval"></b></span><span class="inline"><select class="ivsel" id="tempInt" data-k="tempInt" data-type="num"><option value="30">30 s</option><option value="60">1 min</option><option value="120">2 min</option><option value="300">5 min</option><option value="600">10 min</option><option value="900">15 min</option><option value="1800">30 min</option><option value="3600">1 h</option></select><button type="button" class="btn sm" data-now="temp" data-t="showNow">Jetzt anzeigen</button></span></div>
               <label class="row" for="hum"><span class="rt"><b data-t="hum"></b><small data-t="humSub"></small></span><input type="checkbox" class="sw" id="hum" data-k="hum"></label>
               <div class="row"><span class="rt"><b data-t="interval"></b></span><span class="inline"><select class="ivsel" id="humInt" data-k="humInt" data-type="num"><option value="30">30 s</option><option value="60">1 min</option><option value="120">2 min</option><option value="300">5 min</option><option value="600">10 min</option><option value="900">15 min</option><option value="1800">30 min</option><option value="3600">1 h</option></select><button type="button" class="btn sm" data-now="hum" data-t="showNow">Jetzt anzeigen</button></span></div>
+              <!-- [V14 CHANGE 1] interval text = boot text 2 -->
+              <label class="row" for="cusOn"><span class="rt"><b data-t="cusTitle"></b><small data-t="cusSub"></small></span><input type="checkbox" class="sw" id="cusOn" data-k="cusOn"></label>
+              <div id="cusFields">
+                <div class="row"><span class="rt"><b data-t="interval"></b></span><span class="inline"><select class="ivsel" id="cusInt" data-k="cusInt" data-type="num"><option value="30">30 s</option><option value="60">1 min</option><option value="120">2 min</option><option value="300">5 min</option><option value="600">10 min</option><option value="900">15 min</option><option value="1800">30 min</option><option value="3600">1 h</option></select><button type="button" class="btn sm" data-now="cus" data-t="showNow">Jetzt anzeigen</button></span></div>
+                <div class="row"><span class="rt"><b data-t="cusText"></b></span><input type="text" id="boot2" class="mono" data-k="boot2" maxlength="20" spellcheck="false" autocapitalize="characters" style="max-width:12em"></div>
+                <div class="row"><span class="rt"><b data-t="speed"></b></span><span class="inline"><input type="range" id="cusSpeed" min="40" max="400" step="10" data-k="cusSpeed" data-type="num"><output id="cusSpeedOut" for="cusSpeed"></output></span></div>
+              </div>
             </div>
             <p class="hint" id="htuHint"></p>
           </div>
@@ -429,7 +454,6 @@ canvas.playcv{cursor:pointer}
             </div>
             <div id="bootFields">
               <div class="field"><label for="boot1" data-t="boot1">Text 1</label><input type="text" id="boot1" class="mono" data-k="boot1" maxlength="20" spellcheck="false" autocapitalize="characters" style="max-width:16em"></div>
-              <div class="field"><label for="boot2" data-t="boot2">Text 2</label><input type="text" id="boot2" class="mono" data-k="boot2" maxlength="20" spellcheck="false" autocapitalize="characters" style="max-width:16em"></div>
               <p class="hint" data-t="bootHint"></p>
             </div>
           </div>
@@ -755,14 +779,7 @@ canvas.playcv{cursor:pointer}
             <div id="xBdayList" class="rows"></div>
             <div class="btnrow"><button type="button" class="btn sm" id="xBdayAdd" data-t="bdayAdd"></button><button type="button" class="btn sm primary" id="xBdaySave" data-t="xSave"></button></div>
           </div>
-          <div class="group">
-            <h3 data-t="gAmb"></h3>
-            <p class="hint" data-t="ambHint"></p>
-            <div class="rows">
-              <div class="row"><span class="rt"><b data-t="gAmb"></b></span><select id="xAmb"><option value="0" data-t="amb0"></option><option value="1" data-t="amb1"></option><option value="2" data-t="amb2"></option><option value="3" data-t="amb3"></option><option value="4" data-t="amb4"></option><option value="5" data-t="amb5"></option><option value="6" data-t="amb6"></option><option value="7" data-t="amb7"></option><option value="8" data-t="amb8"></option><option value="9" data-t="amb9"></option></select></div>
-            </div>
-            <div class="btnrow"><button type="button" class="btn sm primary" id="xAmbSave" data-t="xSave"></button></div>
-          </div>
+          <!-- [V14 CHANGE 2] the ambient mode moved to the tab LEDs (colour mode "Ambiente") -->
           <div class="group">
             <h3 data-t="gNtf"></h3>
             <p class="hint" data-t="ntfHint"></p>
@@ -807,11 +824,11 @@ const clone = o => JSON.parse(JSON.stringify(o));
 
 const mock = {
   cfg: {
-    color: "#00ff00", rainbow: 0, bright: 42, brightNight: 21, psu: false,
+    color: "#00ff00", rainbow: 0, amb: 0, rbSub: 0, rndEvery: 0, bright: 42, brightNight: 21, psu: false,
     night: 0, nightDays: [[22,6],[22,6],[22,6],[22,6],[23,6],[23,7],[22,6]],
     lang: 0, deSpecial: 0, blink: false, date: false, dateInt: 60, temp: false, tempInt: 300, hum: false, humInt: 300,
     txt: { dateStyle: 0, tempStyle: 0, humStyle: 0, dateSpeed: 150, tempSpeed: 150, humSpeed: 150, hold: 2000, tempDec: true, dateYear: true, dateSep: 0 },
-    bootText: true, boot1: "COMPANY", boot2: "NAME", minMode: 0, minOrder: "3,4,1,2",
+    bootText: true, boot1: "COMPANY", boot2: "NAME", cusOn: false, cusInt: 300, cusSpeed: 80, minMode: 0, minOrder: "3,4,1,2",
     ledTest: true, setWlan: true, showIp: true,
     ntp: "de.pool.ntp.org", tz: "CET-1CEST,M3.5.0/02,M10.5.0/03",
     hostNum: 0, ping: { on: false, ips: ["192.168.178.56","0.0.0.0","0.0.0.0"], tries: 10, debug: false },
@@ -1015,7 +1032,7 @@ const T = {
     ntpAgo: "NTP, vor {n} Min.", ntpNone: "Kein NTP", rtcOk: "DS3231 erkannt", rtcNo: "Nicht gefunden",
     faceOff: "LEDs ausgeschaltet", faceNightOff: "Nachtmodus: Display aus", faceNightDim: "Nachtmodus: gedimmt",
     gColor: "Farbe", gColorHint: "Gilt, solange der Farbmodus „Einfarbig“ ist.",
-    gMode: "Farbmodus", rb0: "Einfarbig", rb1: "Regenbogen", rb2: "Zufällig",
+    gMode: "Farbmodus", rb0: "Einfarbig", rb1: "Regenbogen", rb2: "Zufällig", rb3: "Ambiente", rbs0: "Pro Wort", rbs1: "Pro Buchstabe", gRnd: "Farbwechsel", rnd0: "Jede Minute", rnd1: "Alle 5 Minuten", rnd2: "Jede Stunde", rnd3: "Nur beim Einschalten", gAmbSel: "Effekt", rbHint1b: "Jeder Buchstabe leuchtet in einer eigenen Zufallsfarbe, jede Minute neu.", rbHint2x: "Die Uhr wählt eine Zufallsfarbe und wechselt sie im unten eingestellten Rhythmus.", rbHint3: "Der Effekt läuft direkt auf den LEDs. Die Vorschau zeigt ihn nachgebaut.", gColorHintAmb: "Grundfarbe dieses Effekts.", cusTitle: "Eigener Text", cusSub: "Läuft im eingestellten Intervall als Lauftext über die Uhr.", cusText: "Text",
     rbHint0: "Alle Wörter leuchten in der gewählten Farbe.",
     rbHint1: "Jedes Wort leuchtet in einer eigenen Zufallsfarbe, jede Minute neu.",
     rbHint2: "Jede Minute wählt die Uhr eine neue Zufallsfarbe.",
@@ -1038,7 +1055,7 @@ const T = {
     temp: "Temperatur", tempSub: "Messwert des Sensors GY-21 / HTU21D, als Lauftext.",
     hum: "Luftfeuchtigkeit", humSub: "Messwert des Sensors GY-21 / HTU21D, als Lauftext.",
     htuOk: "Sensor GY-21 / HTU21D gefunden.", htuNo: "Sensor GY-21 / HTU21D nicht gefunden. Verkabelung prüfen (gleicher I²C-Bus wie die RTC).", htuErr: "Der Sensor antwortet nicht.",
-    bootText: "Eigene Texte beim Einschalten", bootTextSub: "Zwei Lauftexte laufen nach dem LED-Test einmal über die Uhr.",
+    bootText: "Eigener Text beim Einschalten", bootTextSub: "Ein Lauftext läuft nach dem LED-Test einmal über die Uhr.",
     boot1: "Text 1", boot2: "Text 2", bootHint: "Bis zu 20 Zeichen, nur Buchstaben A–Z und Leerzeichen. Leer lassen = Text überspringen.", dt0: "Aus", dt1: "Stündlich", dt2: "Alle 30 Min.",
     dateSub0: "Das Datum wird nicht angezeigt.", dateSub1: "Läuft jede Stunde um :30 einmal über die Uhr.",
     dateSub2: "Läuft um :00 und :30 über die Uhr, zur vollen Stunde nach dem Stundenblinken.",
@@ -1242,7 +1259,7 @@ const T = {
     ntpAgo: "NTP, {n} min ago", ntpNone: "No NTP", rtcOk: "DS3231 found", rtcNo: "Not found",
     faceOff: "LEDs switched off", faceNightOff: "Night mode: display off", faceNightDim: "Night mode: dimmed",
     gColor: "Color", gColorHint: "Used while the color mode is “Single color”.",
-    gMode: "Color mode", rb0: "Single color", rb1: "Rainbow", rb2: "Random",
+    gMode: "Color mode", rb0: "Single color", rb1: "Rainbow", rb2: "Random", rb3: "Ambient", rbs0: "Per word", rbs1: "Per letter", gRnd: "Color change", rnd0: "Every minute", rnd1: "Every 5 minutes", rnd2: "Every hour", rnd3: "Only at startup", gAmbSel: "Effect", rbHint1b: "Every letter lights in its own random color, new every minute.", rbHint2x: "The clock picks a random color and changes it at the rhythm set below.", rbHint3: "The effect runs directly on the LEDs. The preview shows a recreation.", gColorHintAmb: "Base color of this effect.", cusTitle: "Custom text", cusSub: "Scrolls across the clock at the set interval.", cusText: "Text",
     rbHint0: "All words light up in the selected color.",
     rbHint1: "Every word lights up in its own random color, new every minute.",
     rbHint2: "The clock picks a new random color every minute.",
@@ -1265,7 +1282,7 @@ const T = {
     temp: "Temperature", tempSub: "Reading of the GY-21 / HTU21D sensor, as scrolling text.",
     hum: "Humidity", humSub: "Reading of the GY-21 / HTU21D sensor, as scrolling text.",
     htuOk: "GY-21 / HTU21D sensor found.", htuNo: "GY-21 / HTU21D sensor not found. Check the wiring (same I²C bus as the RTC).", htuErr: "The sensor is not responding.",
-    bootText: "Custom texts at startup", bootTextSub: "Two scrolling texts run across the clock once after the LED test.",
+    bootText: "Custom text at startup", bootTextSub: "A scrolling text runs across the clock once after the LED test.",
     boot1: "Text 1", boot2: "Text 2", bootHint: "Up to 20 characters, letters A–Z and spaces only. Leave empty to skip a text.", dt0: "Off", dt1: "Hourly", dt2: "Every 30 min",
     dateSub0: "The date is not shown.", dateSub1: "Scrolls across the clock once every hour at :30.",
     dateSub2: "Scrolls across at :00 and :30, on the hour after the hour flash.",
@@ -1469,7 +1486,7 @@ const T = {
     ntpAgo: "NTP, hace {n} min", ntpNone: "Sin NTP", rtcOk: "DS3231 encontrado", rtcNo: "No encontrado",
     faceOff: "LEDs apagados", faceNightOff: "Modo nocturno: pantalla apagada", faceNightDim: "Modo nocturno: atenuado",
     gColor: "Color", gColorHint: "Se usa mientras el modo de color es «Color único».",
-    gMode: "Modo de color", rb0: "Color único", rb1: "Arcoíris", rb2: "Aleatorio",
+    gMode: "Modo de color", rb0: "Color único", rb1: "Arcoíris", rb2: "Aleatorio", rb3: "Ambiente", rbs0: "Por palabra", rbs1: "Por letra", gRnd: "Cambio de color", rnd0: "Cada minuto", rnd1: "Cada 5 minutos", rnd2: "Cada hora", rnd3: "Solo al encender", gAmbSel: "Efecto", rbHint1b: "Cada letra se ilumina con su propio color aleatorio, nuevo cada minuto.", rbHint2x: "El reloj elige un color aleatorio y lo cambia con el ritmo ajustado abajo.", rbHint3: "El efecto se ejecuta directamente en los LEDs. La vista previa lo muestra recreado.", gColorHintAmb: "Color base de este efecto.", cusTitle: "Texto propio", cusSub: "Se desplaza por el reloj en el intervalo ajustado.", cusText: "Texto",
     rbHint0: "Todas las palabras se iluminan con el color elegido.",
     rbHint1: "Cada palabra se ilumina con su propio color aleatorio, nuevo cada minuto.",
     rbHint2: "El reloj elige un nuevo color aleatorio cada minuto.",
@@ -1492,7 +1509,7 @@ const T = {
     temp: "Temperatura", tempSub: "Valor del sensor GY-21 / HTU21D, como texto desplazable.",
     hum: "Humedad", humSub: "Valor del sensor GY-21 / HTU21D, como texto desplazable.",
     htuOk: "Sensor GY-21 / HTU21D encontrado.", htuNo: "Sensor GY-21 / HTU21D no encontrado. Revisa el cableado (mismo bus I²C que el RTC).", htuErr: "El sensor no responde.",
-    bootText: "Textos propios al encender", bootTextSub: "Dos textos se desplazan una vez por el reloj después de la prueba de LEDs.",
+    bootText: "Texto propio al encender", bootTextSub: "Un texto se desplaza una vez por el reloj después de la prueba de LEDs.",
     boot1: "Texto 1", boot2: "Texto 2", bootHint: "Hasta 20 caracteres, solo letras A–Z y espacios. Déjalo vacío para omitir un texto.",
     gMin: "LEDs de minutos", m0: "Sentido horario", m1: "Sentido antihorario", m2: "Orden personalizado",
     minHint: "Los cuatro LEDs de las esquinas cuentan los minutos entre los pasos de 5 minutos.",
@@ -1711,13 +1728,15 @@ function renderFace() {
   const randomColor = (simMin === null && saved && saved.rainbow === 2 && st.curColor) ? st.curColor : `hsl(${Math.round(seeded(total + 1) * 360)} 95% 58%)`;
   // Rainbow mode: the clock's random word colors of this minute (for other minutes of the time preview: an example)
   const wordColors = cfg.rainbow === 1 ? rbHues(simMin === null && st.rainbowSeed != null ? st.rainbowSeed : Math.floor(seeded(total + 7) * 2147483647), 16) : [];
+  // [V14 CHANGE 2] rainbow per letter: same as the firmware (rainbowRandom(555) + LED number * 40503)
+  const lBase = cfg.rainbow === 1 && cfg.rbSub === 1 ? rbRandom(simMin === null && st.rainbowSeed != null ? st.rainbowSeed : Math.floor(seeded(total + 7) * 2147483647), 555) & 0xFFFF : 0;
   cells.forEach((el, i) => {
     if (!el) return;
     const show = !dark && on.has(i);
     el.classList.toggle("on", show);
     if (!show) return;
     let c = cfg.color;
-    if (cfg.rainbow === 1 && word.has(i)) c = wordColors[word.get(i)];
+    if (cfg.rainbow === 1 && word.has(i)) c = cfg.rbSub === 1 ? `hsl(${Math.round(((lBase + i * 40503) & 0xFFFF) * 360 / 65536)} 100% 55%)` : wordColors[word.get(i)];
     if (cfg.rainbow === 2) c = randomColor;
     if (cfg.blink && m === 0 && hour.has(i)) c = "#ff8000";
     el.style.setProperty("--c", c);
@@ -1742,6 +1761,68 @@ function renderFace() {
   if (simMin === null) { $("#simTime").value = total; }
   $("#simOut").textContent = pad(h) + ":" + pad(m);
   $("#simNow").hidden = simMin === null;
+  ambPrepare(); ambTick();  // [V14 CHANGE 3] ambient effect on top of the picture
+}
+
+
+// ---------------------------------------------------------------------------------------------
+// [V14 CHANGE 3] Ambient effects in the preview. Port of ambientTick() of the firmware (same formulas, same grid coordinates);
+// runs ONLY in the browser (no load for the clock). The firmware uses random noise and the real time zone for "sun", so the preview is similar, not identical.
+// ---------------------------------------------------------------------------------------------
+let ambLit = [], ambNoise = [], ambTimer = null, ambLast = 0;
+const ambCtx = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+function cssToRgb(str) {  // any css colour -> [r, g, b]
+  ambCtx.canvas.width = ambCtx.canvas.height = 1;
+  ambCtx.fillStyle = "#000"; ambCtx.fillStyle = str; ambCtx.fillRect(0, 0, 1, 1);
+  const d = ambCtx.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2]];
+}
+function hue16(h, l) {  // like ambHsv(): colour of hue 0..65535 (full saturation) with brightness l (0..255)
+  const hh = (((h % 65536) + 65536) % 65536) / 65536 * 6, f = hh - Math.floor(hh), q = 1 - f;
+  const [r, g, b] = [[1, f, 0], [q, 1, 0], [0, 1, f], [0, q, 1], [f, 0, 1], [1, 0, q]][Math.floor(hh) % 6];
+  return [r * l, g * l, b * l];
+}
+function sunDay() {  // approximation of sunDayness(): 0 at night, 1 by day
+  const n = new Date(), h = n.getHours() + n.getMinutes() / 60;
+  return Math.max(0, Math.min(1, 0.5 + 0.9 * Math.sin((h - 6) / 12 * Math.PI)));
+}
+function ambPrepare() {
+  ambLit = [];
+  if (!cfg.amb) { if (ambTimer) { clearInterval(ambTimer); ambTimer = null; } return; }
+  cells.forEach((el, i) => {
+    if (!el || !el.classList.contains("on") || el.classList.contains("num")) return;
+    const [r, g, b] = cssToRgb(el.style.getPropertyValue("--c").trim() || "#ffffff");
+    ambLit.push({ el, i, r, g, b, l: Math.max(r, g, b) });
+  });
+  if (!ambTimer) ambTimer = setInterval(ambTick, 30);
+}
+function ambTick() {
+  const m = cfg.amb;
+  if (!m || !ambLit.length) return;
+  const now = performance.now(), gap = m === 4 ? 500 : m === 3 ? 30 : (m === 1 || m === 6) ? 70 : 45;
+  if (now - ambLast < gap) return;
+  ambLast = now;
+  const t = now / 1000, day = m === 4 ? sunDay() : 1;
+  let k3 = 0.5 - 0.5 * Math.cos(t * 2 * Math.PI / 7); k3 = 0.03 + 0.97 * k3 * k3;
+  const rnd = (a, b) => a + Math.floor(Math.random() * (b - a));
+  for (const p of ambLit) {
+    const i = p.i, l = p.l, row = Math.floor(i / 11);
+    const y = i < 110 ? row : 0, x = i < 110 ? (row % 2 ? 10 - (i % 11) : i % 11) : (i - 110) * 3;
+    let r = p.r, g = p.g, b = p.b, n = ambNoise[i] || 0;
+    switch (m) {
+      case 1: n += Math.trunc((rnd(90, 256) - n) / 3); { const f = n / 255; r = l * f; g = l * f * f * 0.45; b = 0; } break;
+      case 2: [r, g, b] = hue16(36000 + 14000 * Math.sin(t / 4 + x * 0.45 + y * 0.3), l); break;
+      case 3: r *= k3; g *= k3; b *= k3; break;
+      case 4: { const k = 0.35 + 0.65 * day; r *= k; g *= k * (0.45 + 0.55 * day); b *= k * (0.15 + 0.85 * day); break; }
+      case 5: [r, g, b] = hue16(36000 + 8500 * Math.sin(t / 3 + x * 0.5 + y * 0.35), l * (0.55 + 0.45 * Math.sin(t * 1.1 + x * 0.6 - y * 0.5))); break;
+      case 6: { n += Math.trunc((rnd(150, 256) - n) / 5); const f = n / 255; r = l * f; g = l * f * 0.62; b = l * f * 0.10; break; }
+      case 7: [r, g, b] = hue16(Math.floor(t * 4500 + x * 3600 + y * 1700), l); break;
+      case 8: { n = rnd(0, 1000) < 12 ? 255 : Math.trunc(n * 0.88); const s2 = n / 255; r += (l - r) * s2; g += (l - g) * s2; b += (l - b) * s2; break; }
+      case 9: { const pp = y / 9 + 0.12 * Math.sin(t / 6 + x * 0.1); [r, g, b] = hue16(Math.floor(3000 - pp * 18500), l); break; }
+    }
+    ambNoise[i] = n;
+    const c = v => Math.round(Math.min(255, Math.max(0, v)));
+    p.el.style.setProperty("--c", `rgb(${c(r)},${c(g)},${c(b)})`);
+  }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1904,7 +1985,16 @@ function renderDeps() {
   $("#psuNote").hidden = cfg.psu;
   $("#colorHex").value = cfg.color.toUpperCase();
   $$("#swatches button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.c === cfg.color.toLowerCase())));
-  $("#rbHint").textContent = t("rbHint" + cfg.rainbow);
+  // [V14 CHANGE 2] one colour mode selector (single / rainbow / random / ambient) with the options of the chosen mode
+  const cm = cfg.amb ? 3 : cfg.rainbow;
+  if (cfg.amb) lastAmb = cfg.amb;
+  $("#cm" + cm).checked = true;
+  $("#optRainbow").hidden = cm !== 1; $("#optRandom").hidden = cm !== 2; $("#optAmb").hidden = cm !== 3;
+  $("#colorGroup").hidden = !(cm === 0 || (cm === 3 && [3, 4, 8].includes(cfg.amb)));  // the picker only where the colour is used (ambient: breathing, sun, sparkle)
+  $("#colorHint").hidden = cm !== 3; $("#colorHint").textContent = cm === 3 ? t("gColorHintAmb") : "";
+  $("#rbHint").textContent = cm === 0 ? "" : t(cm === 1 && cfg.rbSub === 1 ? "rbHint1b" : cm === 2 && cfg.rndEvery !== 0 ? "rbHint2x" : "rbHint" + cm);
+  $("#cusFields").hidden = !cfg.cusOn;
+  $("#cusSpeedOut").textContent = cfg.cusSpeed + " ms";
   // Night
   $("#nightHint").textContent = t("nHint" + cfg.night, { v: cfg.brightNight });
   $("#nightWeek").classList.toggle("off", cfg.night === 0);
@@ -2012,6 +2102,14 @@ function readEl(el) {
   return el.value;
 }
 
+// [V14 CHANGE 2] colour mode: 0 single, 1 rainbow, 2 random (= cfg.rainbow) and 3 ambient (= cfg.amb > 0 with rainbow 0, the effects use the single colour as base)
+let lastAmb = 1;
+function setColorMode(m) {
+  if (cfg.amb) lastAmb = cfg.amb;
+  if (m === 3) { cfg.rainbow = 0; cfg.amb = lastAmb || 1; }
+  else { cfg.rainbow = m; cfg.amb = 0; }
+}
+
 function onInput(e) {
   const el = e.target;
   if (el.dataset.k === "boot1" || el.dataset.k === "boot2") el.value = el.value.toUpperCase().replace(/[^A-Z0-9 .,:!?+\/()&#@'\-]/g, "");
@@ -2023,6 +2121,8 @@ function onInput(e) {
   } else if (el.id === "tzSel") {
     if (el.value !== "custom") cfg.tz = el.value;
     $("#tz").value = cfg.tz;
+  } else if (el.name === "cmode") {
+    setColorMode(Number(el.value));  // [V14 CHANGE 2]
   } else if (el.dataset.k) {
     setPath(cfg, el.dataset.k, readEl(el));
     if (el.dataset.k === "color") cfg.color = cfg.color.toLowerCase();
@@ -2072,7 +2172,7 @@ function updateDirty() {
   const ch = changedKeys();
   $("#savebar").hidden = ch.length === 0;
   $("#dirtyText").textContent = ch.length === 1 ? t("dirty1") : t("dirtyN", { n: ch.length });
-  const tabOf = { led: ["color","rainbow","bright","brightNight","psu"], night: ["night","nightDays"], disp: ["lang","deSpecial","blink","date","dateInt","temp","tempInt","hum","humInt","bootText","boot1","boot2","minMode","minOrder","ledTest","setWlan","showIp"], txt: ["txt","fx.greet"], time: ["ntp","tz"], net: ["hostNum","ping","rest"], sys: ["update","pins","layout","rowMirror","maxMA"], emoji: ["fx.emoji","fx.emojiInt","fx.emojiMode","fx.mask"], play: [], extra: [] };
+  const tabOf = { led: ["color","rainbow","amb","rbSub","rndEvery","bright","brightNight","psu"], night: ["night","nightDays"], disp: ["lang","deSpecial","blink","date","dateInt","temp","tempInt","hum","humInt","bootText","boot1","boot2","cusOn","cusInt","cusSpeed","minMode","minOrder","ledTest","setWlan","showIp"], txt: ["txt","fx.greet"], time: ["ntp","tz"], net: ["hostNum","ping","rest"], sys: ["update","pins","layout","rowMirror","maxMA"], emoji: ["fx.emoji","fx.emojiInt","fx.emojiMode","fx.mask"], play: [], extra: [] };
   $$("#tabs button").forEach(b => {
     const has = ch.some(k => tabOf[b.dataset.tab].includes(k) || tabOf[b.dataset.tab].includes(k.split(".")[0]));
     let d = b.querySelector(".tdot");
@@ -2164,7 +2264,6 @@ async function xLoad() {
   const d = X.d;
   X.list = (d.bday || []).map(b => ({ ...b }));
   $("#xBdayOn").checked = !!d.bdayOn; $("#xBdayEvery").value = String(d.bdayEvery);
-  $("#xAmb").value = String(d.amb);
   const po = d.pomo || {}; $("#xPomoWork").value = po.work || 25; $("#xPomoBrk").value = po.brk || 5; $("#xPomoLng").value = po.lng || 15;
   $("#xTok").textContent = d.token;
   $("#xUrl").textContent = `http://${(cfg && st && st.ip) || location.hostname}/api/notify?key=${d.token}&type=whatsapp&text=ANA`;
@@ -2278,7 +2377,6 @@ function wireExtras() {
     return true;
   }
   $("#xBdaySave").addEventListener("click", bdaySave);
-  $("#xAmbSave").addEventListener("click", () => xPost({ amb: Number($("#xAmb").value) }));
   $("#xPomoSave").addEventListener("click", () => xPost({ pomo: { work: Number($("#xPomoWork").value) || 25, brk: Number($("#xPomoBrk").value) || 5, lng: Number($("#xPomoLng").value) || 15 } }));
   $("#xTokNew").addEventListener("click", async () => { if (await xPost({ newToken: true })) xLoad(); });
   $("#xNtfBtns").addEventListener("click", e => {
@@ -2882,6 +2980,7 @@ async function init() {
     if (cfg.layout === undefined) { cfg.layout = 0; cfg.rowMirror = false; cfg.maxMA = 0; }  // [V6] older firmware: standard panel
     customEmo = (data.custom || []).concat(["", "", "", ""]).slice(0, 4);
     if (!cfg.txt) cfg.txt = { dateStyle: 0, tempStyle: 0, humStyle: 0, dateSpeed: 150, tempSpeed: 150, humSpeed: 150, hold: 2000, tempDec: true, dateYear: true, dateSep: 0 };  // older firmware
+    if (cfg.amb === undefined) { cfg.amb = 0; cfg.rbSub = 0; cfg.rndEvery = 0; cfg.cusOn = false; cfg.cusInt = 300; cfg.cusSpeed = 80; }  // [V14] older firmware
     saved = clone(cfg);
   } catch (e) { toast(t("loadErr")); return; }
   L = ["de", "en", "es"][cfg.lang] || "de";

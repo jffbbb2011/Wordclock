@@ -10,6 +10,11 @@
 // ###########################################################################################################################################
 // # [FORK] Layout version (10 x 11 panel) with the improvements of the fork V6.1.0.2 merged in. Own version numbers have 4 parts
 // #   (V6.1.0.1, V6.1.0.2, ...), see parseVersion() / compareVersions(). Update source: UPDATE_REPO in settings.h.
+// # [FORK] V6.2.0.6 (marked "[V14 CHANGE n]"):
+// #   1. The 2nd boot text is now an INTERVAL TEXT (web tab Display: on/off, interval 30 s - 1 h, speed), like date / temperature / humidity. Only text 1 is still shown at startup.
+// #   2. Rainbow mode has 2 variants: every WORD or every LETTER in its own colour (xt.rbSub).
+// #   3. Random mode: how often the colour changes - every minute / 5 minutes / hour / only at start (xt.rndEvery).
+// #   4. Ambient effects are chosen together with the colour mode (web tab LEDs, key "amb" of /api/config); an effect uses the single colour as base.
 // # [FORK] V6.2.0.5 (marked "[V13 CHANGE n]"):
 // #   1. Notifications: the scrolling text (name / number) can now be switched on / off for EVERY app (WhatsApp, call, SMS, mail, Telegram, bell, Outlook, Discord,
 // #      Teams, Instagram, Slack, YouTube, Spotify, Messenger, Signal, X, Facebook, LinkedIn, TikTok, Snapchat, Reddit, Calendar, Zoom): tab "Extras".
@@ -129,7 +134,7 @@ SET_LOOP_TASK_STACK_SIZE(24 * 1024);
 // ###########################################################################################################################################
 // # Version number of the code:
 // ###########################################################################################################################################
-const char* WORD_CLOCK_VERSION = "V6.2.0.5";  // [V13] the text (name / number) of a notification can be switched on / off for EVERY app (23 types, was 6), see xtRec.ntfOff32 and showNotify(). Older: [V12] ten more app icons (Signal, Outlook, X, Facebook, LinkedIn, TikTok, Snapchat, Reddit, Calendar, Zoom). Older: [V11] new app icons (WhatsApp, Telegram, Gmail redrawn; Discord, Teams, Instagram, Slack, YouTube, Spotify, Messenger added; the type may be an app name). Older: [V10 FIX] hostname number (WordClock<n>) is applied at boot before the WiFi connects and the clock restarts after changing it. Older notes: was "V6.2.0.1". [V6 CHANGE 1] was "V6.1.0.5" - ONE firmware for the standard and the big panel (web page: System > Layout). Older notes: [V5 CHANGE 4] was "V6.1.0.4" - emojis, Christmas / New Year greetings, Play tab (games). Older notes: [V4 CHANGE 5] was "V6.1.0.3" - date separator setting. Older notes:  // [V3 CHANGE 4] was "V6.1.0.2" - must be exactly the GitHub release tag. V6.1.0.3 = fix: temperature / humidity / date timers (see V3 CHANGE 1-3).
+const char* WORD_CLOCK_VERSION = "V6.2.0.6";  // [V14] interval text (boot text 2), rainbow per word / per letter, random colour interval, ambient mode in the colour mode. Older: [V13] the text (name / number) of a notification can be switched on / off for EVERY app (23 types, was 6), see xtRec.ntfOff32 and showNotify(). Older: [V12] ten more app icons (Signal, Outlook, X, Facebook, LinkedIn, TikTok, Snapchat, Reddit, Calendar, Zoom). Older: [V11] new app icons (WhatsApp, Telegram, Gmail redrawn; Discord, Teams, Instagram, Slack, YouTube, Spotify, Messenger added; the type may be an app name). Older: [V10 FIX] hostname number (WordClock<n>) is applied at boot before the WiFi connects and the clock restarts after changing it. Older notes: was "V6.2.0.1". [V6 CHANGE 1] was "V6.1.0.5" - ONE firmware for the standard and the big panel (web page: System > Layout). Older notes: [V5 CHANGE 4] was "V6.1.0.4" - emojis, Christmas / New Year greetings, Play tab (games). Older notes: [V4 CHANGE 5] was "V6.1.0.3" - date separator setting. Older notes:  // [V3 CHANGE 4] was "V6.1.0.2" - must be exactly the GitHub release tag. V6.1.0.3 = fix: temperature / humidity / date timers (see V3 CHANGE 1-3).
 // [FORK] previous note:  // [FORK] the release tag on GitHub must be exactly this text
 
 
@@ -217,6 +222,7 @@ bool portalActive = false;                                                      
 bool servicesStarted = false;                                                        // Configuration page, REST and update functions are running
 bool wasConnected = false;                                                           // WiFi state of the last loop pass
 bool ipShown = false;                                                                // IP-address was shown after the first connection
+bool rndDone = false;  // [V14 CHANGE 3] random colour: a colour was drawn since start / since the mode was switched on
 int lastColorMinute = -1;                                                            // Minute of the last random colors (RainBow variants)
 uint32_t rainbowSeed = 0;                                                            // RainBow variant 1: random colors of the words, new every minute
 int rainbowWordNr = -1;                                                              // RainBow variant 1: number of the word set by showCurrentTime(), -1 = not in showCurrentTime()
@@ -397,7 +403,15 @@ struct xtRec {
   //   18 TikTok, 19 Snapchat, 20 Reddit, 21 Calendar, 22 Zoom. Appended at the END; ntfOk == 0xA5 marks that the field was written by this version.
   uint32_t ntfOff32;
   uint8_t ntfOk;
+  // [V14] appended at the END; v14Ok == V14_OK marks that these fields were written by this version (old records have garbage here)
+  uint8_t v14Ok;
+  uint8_t cusOn;     // [V14 CHANGE 1] interval text (bootText2) on / off
+  uint8_t rbSub;     // [V14 CHANGE 2] rainbow: 0 = every word, 1 = every letter its own colour
+  uint8_t rndEvery;  // [V14 CHANGE 3] random colour: 0 = every minute, 1 = every 5 minutes, 2 = every hour, 3 = only at start
+  uint16_t cusInt;   // [V14 CHANGE 1] interval in seconds (30..86400)
+  uint16_t cusSpeed; // [V14 CHANGE 1] milliseconds per column of the interval text
 } xt;
+#define V14_OK 0xB6  // [V14] marker of the V14 fields of xtRec
 #define NTF_OK 0xA5  // [V13 CHANGE 1] marker of a valid xt.ntfOff32
 #define XT_MAGIC 0x57435831UL  // "WCX1"
 #define XT_OFFSET (LAY_OFFSET + ((sizeof(layRec) + 3) / 4) * 4)
@@ -426,6 +440,8 @@ void xtDefaults() {
   xt.pomoLng = 15;
   xt.ntfOff32 = 0;  // [V13 CHANGE 1] all texts on
   xt.ntfOk = NTF_OK;
+  xt.v14Ok = V14_OK;  // [V14]
+  xt.cusOn = 0; xt.rbSub = 0; xt.rndEvery = 0; xt.cusInt = 300; xt.cusSpeed = 80;
   xtNewToken();
 }
 
@@ -716,9 +732,17 @@ void loop() {
       lastColorMinute = iMinute;
       rainbowSeed = random(0x7FFFFFFF);  // RainBow variant 1: new random colors for the words
       if (switchRainBow == 2) {          // RainBow variant 2 effect active - one random color for all words
-        redVal = random(255);
-        greenVal = random(255);
-        blueVal = random(255);
+        // [V14 CHANGE 3] only when due: every minute / 5 minutes / hour / only once (xt.rndEvery); the first colour is always drawn at once
+        bool due = !rndDone;
+        if (xt.rndEvery == 0) due = true;
+        else if (xt.rndEvery == 1 && iMinute % 5 == 0) due = true;
+        else if (xt.rndEvery == 2 && iMinute == 0) due = true;
+        if (due) {
+          rndDone = true;
+          redVal = random(255);
+          greenVal = random(255);
+          blueVal = random(255);
+        }
       }
     }
 
@@ -937,6 +961,11 @@ void readEEPROM() {
   if (xt.ntfOk != NTF_OK || xt.ntfOff32 > 0x7FFFFFUL) {
     xt.ntfOff32 = xt.ntfOff & 63;
     xt.ntfOk = NTF_OK;
+    writeXtConfig();
+  }
+  // [V14] old record: garbage behind ntfOk -> defaults (interval text off, rainbow per word, random every minute, speed 80 ms like the old boot text)
+  if (xt.v14Ok != V14_OK || xt.cusOn > 1 || xt.rbSub > 1 || xt.rndEvery > 3 || xt.cusInt < 30 || xt.cusInt > 86400 || xt.cusSpeed < 30 || xt.cusSpeed > 600) {
+    xt.v14Ok = V14_OK; xt.cusOn = 0; xt.rbSub = 0; xt.rndEvery = 0; xt.cusInt = 300; xt.cusSpeed = 80;
     writeXtConfig();
   }
 }
@@ -1421,7 +1450,8 @@ void printLetterAt(const byte* colData, int x, int y) {
 // # Scrolls an arbitrary uppercase text (letters A-Z and spaces) across the display once, using the same scrolling technique
 // # as showIP() / showCurrentDate(). Unsupported characters are simply shown as a blank column - see getGlyph() above:
 // ###########################################################################################################################################
-void showScrollText(const char* text) {
+// [V14 CHANGE 1] speedMs = milliseconds per column (was fixed 80); showScrollText() keeps the old behaviour
+void showScrollTextSpeed(const char* text, int speedMs) {
   const int charWidth = 6;  // 5 pixel wide letter + 1 pixel gap
   const int numChars = strlen(text);
   const int totalWidth = numChars * charWidth;
@@ -1432,10 +1462,13 @@ void showScrollText(const char* text) {
       printLetterAt(getGlyph(text[i]), x + i * charWidth, 2);
     }
     showLimited();
-    delay(80);  // set speed of timeshift
+    delay(speedMs);  // set speed of timeshift
   }
   dunkel();
   showLimited();
+}
+void showScrollText(const char* text) {
+  showScrollTextSpeed(text, 80);
 }
 
 
@@ -1452,12 +1485,7 @@ void showBootTexts() {
     showScrollText(bt1.c_str());
   }
 
-  if (bootText2.length() > 0) {
-    String bt2 = bootText2;
-    bt2.toUpperCase();  // font only supports uppercase letters
-    Serial.println("Show boot text 2: " + bt2);
-    showScrollText(bt2.c_str());
-  }
+  // [V14 CHANGE 1] boot text 2 is no longer shown at startup: it is the interval text now (showCustomText(), tab Display)
 }
 
 
@@ -2401,13 +2429,24 @@ unsigned long nextDateShowMillis = 0;
 unsigned long nextTempShowMillis = 0;
 unsigned long nextHumidityShowMillis = 0;
 unsigned long nextEmojiShowMillis = 0;  // [V5 CHANGE 1]
+unsigned long nextCusShowMillis = 0;    // [V14 CHANGE 1] interval text
+bool triggerShowCusNow = false;         // [V14 CHANGE 1] "show now" button
 bool autoShowInit = false;
+
+// [V14 CHANGE 1] The interval text = bootText2 (max. 20 characters), scrolled with its own speed.
+void showCustomText() {
+  if (bootText2.length() == 0) return;
+  String t = bootText2;
+  t.toUpperCase();  // font only supports uppercase letters
+  showScrollTextSpeed(t.c_str(), xt.cusSpeed);
+}
 
 void resetAutoShowTimers() {
   nextDateShowMillis = millis() + (unsigned long)max(showDateIntervalSec, 5) * 1000UL;
   nextTempShowMillis = millis() + (unsigned long)max(showTempIntervalSec, 5) * 1000UL;
   nextHumidityShowMillis = millis() + (unsigned long)max(showHumidityIntervalSec, 5) * 1000UL;
   nextEmojiShowMillis = millis() + (unsigned long)max((int)fx.emojiIntSec, 30) * 1000UL;
+  nextCusShowMillis = millis() + (unsigned long)max((int)xt.cusInt, 30) * 1000UL;  // [V14 CHANGE 1]
   autoShowInit = true;
 }
 
@@ -3170,6 +3209,17 @@ void ShowTheTime() {
     if (!showCurrentHumidity()) nextHumidityShowMillis = millis() + 10000UL;  // [V3 CHANGE 1] sensor not ready: retry in 10 s
   }
 
+  // [V14 CHANGE 1] interval text:
+  if (xt.cusOn && (long)(millis() - nextCusShowMillis) >= 0) {
+    nextCusShowMillis = nextAutoShow(nextCusShowMillis, xt.cusInt);
+    showCustomText();
+  }
+  if (triggerShowCusNow) {
+    triggerShowCusNow = false;
+    showCustomText();
+    nextCusShowMillis = millis() + (unsigned long)max((int)xt.cusInt, 30) * 1000UL;
+  }
+
   // Manual "Show now" buttons on the web configuration page (they restart the timer of that screen):
   if (triggerShowDateNow) {
     triggerShowDateNow = false;
@@ -3625,9 +3675,18 @@ void setLED(int ledNrFrom, int ledNrTo, int switchOn) {
       if (ledNrFrom > ledNrTo) {
         setLED(ledNrTo, ledNrFrom, switchOn);
       } else {
-        uint32_t color = pixels.gamma32(pixels.ColorHSV(rainbowHue(ledNrFrom)));
-        for (int i = ledNrFrom; i <= ledNrTo; i++) {
-          if ((i >= 0) && (i < NUMPIXELS)) setPx(i, color);
+        if (xt.rbSub == 1 && rainbowWordNr >= 0) {
+          // [V14 CHANGE 2] every LETTER its own colour: hue = random start of the minute + LED number * golden angle (neighbours always differ).
+          // The web page calculates the same (rbRandom(seed, 555) + i * 40503), so the preview shows the same colours.
+          uint32_t base = rainbowRandom(555) & 0xFFFF;
+          for (int i = ledNrFrom; i <= ledNrTo; i++) {
+            if ((i >= 0) && (i < NUMPIXELS)) setPx(i, pixels.gamma32(pixels.ColorHSV((uint16_t)(base + (uint32_t)i * 40503UL))));
+          }
+        } else {
+          uint32_t color = pixels.gamma32(pixels.ColorHSV(rainbowHue(ledNrFrom)));
+          for (int i = ledNrFrom; i <= ledNrTo; i++) {
+            if ((i >= 0) && (i < NUMPIXELS)) setPx(i, color);
+          }
         }
       }
     } else {
@@ -4359,6 +4418,12 @@ void handleApiState() {
   c["bootText"] = useBootText != 0;
   c["boot1"] = bootText1;
   c["boot2"] = bootText2;
+  c["cusOn"] = xt.cusOn != 0;  // [V14]
+  c["cusInt"] = xt.cusInt;
+  c["cusSpeed"] = xt.cusSpeed;
+  c["rbSub"] = xt.rbSub;
+  c["rndEvery"] = xt.rndEvery;
+  c["amb"] = xt.ambMode;  // ambient effect (0 = off) - chosen together with the colour mode
   c["minMode"] = minModeValue();
   c["minOrder"] = minuteOrderToDisplayString();
   c["ledTest"] = useledtest != 0;
@@ -4437,6 +4502,13 @@ void handleApiConfig() {
   }
   if (c["color"].is<const char*>() && !hexToColor(c["color"].as<const char*>(), r, g, b)) return sendError(400, "color");
   int rainbow = constrain((int)(c["rainbow"] | switchRainBow), 0, 2);
+  int amb = constrain((int)(c["amb"] | (int)xt.ambMode), 0, 9);  // [V14 CHANGE 4] ambient effect; an effect uses the single colour as base
+  if (amb) rainbow = 0;
+  int cusInt = constrain((int)(c["cusInt"] | (int)xt.cusInt), 30, 86400);  // [V14 CHANGE 1]
+  int cusSpeed = constrain((int)(c["cusSpeed"] | (int)xt.cusSpeed), 30, 600);
+  bool cusOn = c["cusOn"] | (xt.cusOn != 0);
+  int rbSub = constrain((int)(c["rbSub"] | (int)xt.rbSub), 0, 1);  // [V14 CHANGE 2]
+  int rndEvery = constrain((int)(c["rndEvery"] | (int)xt.rndEvery), 0, 3);  // [V14 CHANGE 3]
   bool psu = c["psu"] | (powersupply != 0);
   int maxIntensity = psu ? 255 : 128;
   int bright = constrain((int)(c["bright"] | intensity), 1, maxIntensity);
@@ -4539,6 +4611,10 @@ void handleApiConfig() {
   redVal = r;
   greenVal = g;
   blueVal = b;
+  if ((rainbow == 2 && switchRainBow != 2) || rndEvery != xt.rndEvery) {  // [V14 CHANGE 3] draw a new random colour at once
+    rndDone = false;
+    lastColorMinute = -1;
+  }
   switchRainBow = rainbow;
   powersupply = psu ? 1 : 0;
   intensity = bright;
@@ -4578,6 +4654,16 @@ void handleApiConfig() {
   useBootText = bootOn ? -1 : 0;
   bootText1 = boot1;
   bootText2 = boot2;
+  xt.cusOn = cusOn ? 1 : 0;  // [V14]
+  xt.cusInt = cusInt;
+  xt.cusSpeed = cusSpeed;
+  xt.rbSub = rbSub;
+  xt.rndEvery = rndEvery;
+  if (xt.ambMode != amb) {
+    xt.ambMode = amb;
+    ambReady = false;
+  }
+  writeXtConfig();
   if (minMode == 2) {
     useCustomMinuteOrder = 1;
     for (int k = 0; k < 4; k++) minuteLedOrder[k] = order[k];
@@ -4662,6 +4748,8 @@ void handleApiShowNow() {  // "Show now" buttons: {"what":"date"|"temp"|"hum"}
     if (!checkHTU()) return sendError(503, "sensor");
     if (what == "temp") triggerShowTempNow = true;
     else triggerShowHumidityNow = true;
+  } else if (what == "cus") {  // [V14 CHANGE 1] interval text
+    triggerShowCusNow = true;
   } else if (what == "emoji") {  // [V5] {"what":"emoji","id":0..15}
     int id = doc["id"] | -1;
     if (!emojiExists(id)) return sendError(400, "id");
