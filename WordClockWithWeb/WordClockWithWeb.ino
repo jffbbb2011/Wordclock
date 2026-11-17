@@ -10,6 +10,11 @@
 // ###########################################################################################################################################
 // # [FORK] Layout version (10 x 11 panel) with the improvements of the fork V6.1.0.2 merged in. Own version numbers have 4 parts
 // #   (V6.1.0.1, V6.1.0.2, ...), see parseVersion() / compareVersions(). Update source: UPDATE_REPO in settings.h.
+// # [FORK] V6.2.0.8 (marked "[V16 CHANGE n]"):
+// #   1. The letter Z of the scrolling font was mirrored (columns in the wrong order): fixed (fontZ).
+// #   2. Update from GitHub: WiFi power saving is switched off during the download, up to 3 attempts (pause 3 s) before the red error is shown.
+// #   3. The error code (and the WiFi signal) of the last failed update is stored (xt.updErr / xt.updRssi) and sent to the web page (/api/state: updErr, updRssi).
+// #   4. The interval text (free text) can have up to 80 characters (was 20): stored in xt.cusText, web key "cusText". Boot text 1 keeps 20 characters.
 // # [FORK] V6.2.0.7 (marked "[V15 CHANGE n]"):
 // #   1. Ambient mode: the effect (fire, aurora, ...) now also colours the scrolling texts (date, temperature, humidity, own interval text, boot text).
 // #      Before, the effects only worked on the time picture, so every text was shown in the single colour. Other modes were not affected.
@@ -137,7 +142,7 @@ SET_LOOP_TASK_STACK_SIZE(24 * 1024);
 // ###########################################################################################################################################
 // # Version number of the code:
 // ###########################################################################################################################################
-const char* WORD_CLOCK_VERSION = "V6.2.0.7";  // [V15] the ambient effect also runs on the scrolling texts (date, temperature, humidity, own text, boot text). Older: [V14] interval text (boot text 2), rainbow per word / per letter, random colour interval, ambient mode in the colour mode. Older: [V13] the text (name / number) of a notification can be switched on / off for EVERY app (23 types, was 6), see xtRec.ntfOff32 and showNotify(). Older: [V12] ten more app icons (Signal, Outlook, X, Facebook, LinkedIn, TikTok, Snapchat, Reddit, Calendar, Zoom). Older: [V11] new app icons (WhatsApp, Telegram, Gmail redrawn; Discord, Teams, Instagram, Slack, YouTube, Spotify, Messenger added; the type may be an app name). Older: [V10 FIX] hostname number (WordClock<n>) is applied at boot before the WiFi connects and the clock restarts after changing it. Older notes: was "V6.2.0.1". [V6 CHANGE 1] was "V6.1.0.5" - ONE firmware for the standard and the big panel (web page: System > Layout). Older notes: [V5 CHANGE 4] was "V6.1.0.4" - emojis, Christmas / New Year greetings, Play tab (games). Older notes: [V4 CHANGE 5] was "V6.1.0.3" - date separator setting. Older notes:  // [V3 CHANGE 4] was "V6.1.0.2" - must be exactly the GitHub release tag. V6.1.0.3 = fix: temperature / humidity / date timers (see V3 CHANGE 1-3).
+const char* WORD_CLOCK_VERSION = "V6.2.0.8";  // [V16] update: 3 download attempts, no WiFi power saving, last error shown in the web page; free text up to 80 characters; letter Z fixed. Older: [V15] the ambient effect also runs on the scrolling texts (date, temperature, humidity, own text, boot text). Older: [V14] interval text (boot text 2), rainbow per word / per letter, random colour interval, ambient mode in the colour mode. Older: [V13] the text (name / number) of a notification can be switched on / off for EVERY app (23 types, was 6), see xtRec.ntfOff32 and showNotify(). Older: [V12] ten more app icons (Signal, Outlook, X, Facebook, LinkedIn, TikTok, Snapchat, Reddit, Calendar, Zoom). Older: [V11] new app icons (WhatsApp, Telegram, Gmail redrawn; Discord, Teams, Instagram, Slack, YouTube, Spotify, Messenger added; the type may be an app name). Older: [V10 FIX] hostname number (WordClock<n>) is applied at boot before the WiFi connects and the clock restarts after changing it. Older notes: was "V6.2.0.1". [V6 CHANGE 1] was "V6.1.0.5" - ONE firmware for the standard and the big panel (web page: System > Layout). Older notes: [V5 CHANGE 4] was "V6.1.0.4" - emojis, Christmas / New Year greetings, Play tab (games). Older notes: [V4 CHANGE 5] was "V6.1.0.3" - date separator setting. Older notes:  // [V3 CHANGE 4] was "V6.1.0.2" - must be exactly the GitHub release tag. V6.1.0.3 = fix: temperature / humidity / date timers (see V3 CHANGE 1-3).
 // [FORK] previous note:  // [FORK] the release tag on GitHub must be exactly this text
 
 
@@ -422,7 +427,13 @@ struct xtRec {
   uint8_t rndEvery;  // [V14 CHANGE 3] random colour: 0 = every minute, 1 = every 5 minutes, 2 = every hour, 3 = only at start
   uint16_t cusInt;   // [V14 CHANGE 1] interval in seconds (30..86400)
   uint16_t cusSpeed; // [V14 CHANGE 1] milliseconds per column of the interval text
+  // [V16] appended at the END; v16Ok == V16_OK marks that these fields were written by this version
+  int16_t updErr;    // [V16 CHANGE 3] error code of the last failed update (0 = none)
+  int16_t updRssi;   // [V16 CHANGE 3] WiFi signal (dBm) when it failed
+  uint8_t v16Ok;
+  char cusText[81];  // [V16 CHANGE 4] interval text (free text), up to 80 characters
 } xt;
+#define V16_OK 0xC7  // [V16] marker of the V16 fields of xtRec
 #define V14_OK 0xB6  // [V14] marker of the V14 fields of xtRec
 #define NTF_OK 0xA5  // [V13 CHANGE 1] marker of a valid xt.ntfOff32
 #define XT_MAGIC 0x57435831UL  // "WCX1"
@@ -454,6 +465,7 @@ void xtDefaults() {
   xt.ntfOk = NTF_OK;
   xt.v14Ok = V14_OK;  // [V14]
   xt.cusOn = 0; xt.rbSub = 0; xt.rndEvery = 0; xt.cusInt = 300; xt.cusSpeed = 80;
+  xt.v16Ok = V16_OK; xt.updErr = 0; xt.updRssi = 0; xt.cusText[0] = 0;  // [V16]
   xtNewToken();
 }
 
@@ -980,6 +992,13 @@ void readEEPROM() {
     xt.v14Ok = V14_OK; xt.cusOn = 0; xt.rbSub = 0; xt.rndEvery = 0; xt.cusInt = 300; xt.cusSpeed = 80;
     writeXtConfig();
   }
+  // [V16] old record: garbage behind cusText -> no update error; the free text starts with the old boot text 2 (it was the interval text since V14)
+  if (xt.v16Ok != V16_OK) {
+    xt.v16Ok = V16_OK; xt.updErr = 0; xt.updRssi = 0;
+    strlcpy(xt.cusText, bootText2.c_str(), sizeof(xt.cusText));
+    writeXtConfig();
+  }
+  xt.cusText[sizeof(xt.cusText) - 1] = 0;
 }
 
 
@@ -1379,7 +1398,7 @@ const byte fontV[5] = { 0x1F, 0x20, 0x40, 0x20, 0x1F };
 const byte fontW[5] = { 0x3F, 0x40, 0x38, 0x40, 0x3F };
 const byte fontX[5] = { 0x63, 0x14, 0x08, 0x14, 0x63 };
 const byte fontY[5] = { 0x07, 0x08, 0x70, 0x08, 0x07 };
-const byte fontZ[5] = { 0x43, 0x45, 0x49, 0x51, 0x61 };
+const byte fontZ[5] = { 0x61, 0x51, 0x49, 0x45, 0x43 };  // [V16 CHANGE 1] was { 0x43, 0x45, 0x49, 0x51, 0x61 } = mirrored Z
 const byte fontPercent[5] = { 0x23, 0x13, 0x08, 0x64, 0x62 };  // '%' symbol, used for the humidity display
 
 
@@ -2452,8 +2471,8 @@ bool autoShowInit = false;
 // [V14 CHANGE 1] The interval text = bootText2 (max. 20 characters), scrolled with its own speed.
 void showCustomText() {
   AmbTextScope ambScope;  // [V15 CHANGE 1] ambient effect on this text
-  if (bootText2.length() == 0) return;
-  String t = bootText2;
+  if (xt.cusText[0] == 0) return;  // [V16 CHANGE 4] was bootText2 (max. 20 characters)
+  String t = String(xt.cusText);
   t.toUpperCase();  // font only supports uppercase letters
   showScrollTextSpeed(t.c_str(), xt.cusSpeed);
 }
@@ -4449,6 +4468,7 @@ void handleApiState() {
   c["bootText"] = useBootText != 0;
   c["boot1"] = bootText1;
   c["boot2"] = bootText2;
+  c["cusText"] = xt.cusText;  // [V16 CHANGE 4]
   c["cusOn"] = xt.cusOn != 0;  // [V14]
   c["cusInt"] = xt.cusInt;
   c["cusSpeed"] = xt.cusSpeed;
@@ -4485,6 +4505,8 @@ void handleApiState() {
   s["mac"] = WiFi.macAddress();
   s["ssid"] = WiFi.SSID();
   s["rssi"] = WiFi.RSSI();
+  s["updErr"] = xt.updErr;    // [V16 CHANGE 3] last failed update (0 = none) and the signal at that time
+  s["updRssi"] = xt.updRssi;
   unsigned long ntpAge = lastNtpSync ? millis() - lastNtpSync : 0;
   s["ntpOk"] = lastNtpSync != 0 && ntpAge < 3UL * 3600UL * 1000UL;
   s["ntpAgoMin"] = lastNtpSync ? (long)(ntpAge / 60000UL) : -1;
@@ -4540,6 +4562,7 @@ void handleApiConfig() {
   bool cusOn = c["cusOn"] | (xt.cusOn != 0);
   int rbSub = constrain((int)(c["rbSub"] | (int)xt.rbSub), 0, 1);  // [V14 CHANGE 2]
   int rndEvery = constrain((int)(c["rndEvery"] | (int)xt.rndEvery), 0, 3);  // [V14 CHANGE 3]
+  String cusText = c["cusText"].is<const char*>() ? cleanText(c["cusText"].as<const char*>(), 80) : String(xt.cusText);  // [V16 CHANGE 4]
   bool psu = c["psu"] | (powersupply != 0);
   int maxIntensity = psu ? 255 : 128;
   int bright = constrain((int)(c["bright"] | intensity), 1, maxIntensity);
@@ -4690,6 +4713,7 @@ void handleApiConfig() {
   xt.cusSpeed = cusSpeed;
   xt.rbSub = rbSub;
   xt.rndEvery = rndEvery;
+  strlcpy(xt.cusText, cusText.c_str(), sizeof(xt.cusText));  // [V16 CHANGE 4]
   if (xt.ambMode != amb) {
     xt.ambMode = amb;
     ambReady = false;
@@ -4761,8 +4785,11 @@ void handleApiConfig() {
 }
 
 String cleanBootText(const char* in) {  // Boot texts: letters A-Z and spaces only, max. 20 characters
+  return cleanText(in, 20);
+}
+String cleanText(const char* in, int maxLen) {  // [V16 CHANGE 4] same, with a maximum length (free text: 80)
   String out = "";
-  for (const char* p = in; *p && out.length() < 20; p++) {
+  for (const char* p = in; *p && (int)out.length() < maxLen; p++) {
     char ch = toupper((unsigned char)*p);
     if ((ch >= 'A' && ch <= 'Z') || ch == ' ' || isTextChar(ch)) out += ch;  // [V8] digits and symbols too
   }
@@ -4967,42 +4994,62 @@ String resolveDownloadUrl(String url) {
   return "";
 }
 
-void installReleaseNow(const String& tag) {  // Download and install the update file of the release (called with as much free memory as possible)
-  Serial.println("Update: installing release " + tag + " (" UPDATE_BIN_NAME ")");
-  String url = "https://github.com/" UPDATE_REPO "/releases/download/" + tag + "/" UPDATE_BIN_NAME;
-  String finalUrl = resolveDownloadUrl(url);
-  if (!finalUrl.length()) {
-    Serial.println("Update: the download address could not be resolved");
-    update_error(-1);
-    delay(3000);
-    ESP.restart();
-    return;
-  }
-  WiFiClientSecure client;
-  client.setInsecure();
-#if !defined(ESP32)
-  client.setBufferSizes(16709, 512);  // [V10 FIX] ESP8266: full TLS input record (the server does not support smaller ones), small output buffer
-#endif
-  ESPhttpUpdate.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);  // already resolved above
-  ESPhttpUpdate.onStart(update_started);
-  ESPhttpUpdate.onEnd(update_finished);
-  ESPhttpUpdate.onProgress(update_progress);
-  ESPhttpUpdate.onError(update_error);
-  t_httpUpdate_return ret = ESPhttpUpdate.update(client, finalUrl);
-  switch (ret) {
-    case HTTP_UPDATE_FAILED:
-      Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
-      ESP.restart();  // update_error() changed the colors and showed RESET, so start clean
-      break;
-    case HTTP_UPDATE_NO_UPDATES:
-      Serial.println("HTTP_UPDATE_NO_UPDATES");
-      break;
-    case HTTP_UPDATE_OK:
-      Serial.println("HTTP_UPDATE_OK");
-      break;
-  }
+// [V16 CHANGE 2] quiet error callback for the single download attempts: the red RESET message (update_error) only comes after the LAST attempt
+void update_error_quiet(int err) {
+  Serial.printf("Update: download attempt failed, error %d\n", err);
 }
 
+void installReleaseNow(const String& tag) {  // Download and install the update file of the release (called with as much free memory as possible)
+  Serial.println("Update: installing release " + tag + " (" UPDATE_BIN_NAME ")");
+  // [V16 CHANGE 2] WiFi power saving adds latency and lowers the speed: off during the download (weak signal = timeouts)
+#if defined(ESP32)
+  WiFi.setSleep(false);
+#else
+  WiFi.setSleepMode(WIFI_NONE_SLEEP);
+#endif
+  xt.updErr = 0; xt.updRssi = 0; writeXtConfig();  // [V16 CHANGE 3] forget the error of an earlier attempt
+  int lastErr = 0;
+  for (int attempt = 1; attempt <= 3; attempt++) {  // [V16 CHANGE 2] up to 3 attempts
+    Serial.printf("Update: attempt %d of 3, WiFi signal %d dBm\n", attempt, WiFi.RSSI());
+    String url = "https://github.com/" UPDATE_REPO "/releases/download/" + tag + "/" UPDATE_BIN_NAME;
+    String finalUrl = resolveDownloadUrl(url);
+    if (!finalUrl.length()) {
+      Serial.println("Update: the download address could not be resolved");
+      lastErr = -200;
+    } else {
+      WiFiClientSecure client;
+      client.setInsecure();
+#if !defined(ESP32)
+      client.setBufferSizes(16709, 512);  // [V10 FIX] ESP8266: full TLS input record (the server does not support smaller ones), small output buffer
+#endif
+      ESPhttpUpdate.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);  // already resolved above
+      ESPhttpUpdate.onStart(update_started);
+      ESPhttpUpdate.onEnd(update_finished);
+      ESPhttpUpdate.onProgress(update_progress);
+      ESPhttpUpdate.onError(update_error_quiet);
+      t_httpUpdate_return ret = ESPhttpUpdate.update(client, finalUrl);
+      if (ret == HTTP_UPDATE_OK) {
+        Serial.println("HTTP_UPDATE_OK");
+        return;
+      }
+      if (ret == HTTP_UPDATE_NO_UPDATES) {
+        Serial.println("HTTP_UPDATE_NO_UPDATES");
+        return;
+      }
+      lastErr = ESPhttpUpdate.getLastError();
+      Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", lastErr, ESPhttpUpdate.getLastErrorString().c_str());
+    }
+    if (attempt < 3) {
+      delay(3000);  // short pause, then try again
+      ESP_WDT_FEED();
+    }
+  }
+  xt.updErr = lastErr;  // [V16 CHANGE 3] the web page shows this code
+  xt.updRssi = WiFi.RSSI();
+  writeXtConfig();
+  update_error(lastErr);  // changes the colors and shows RESET
+  ESP.restart();          // start clean
+}
 
 // [V10 FIX 3] ESP8266: during normal operation only ~27 KB of heap are free, not enough for the TLS download (error -1).
 // So the update is done right after a restart: the version is remembered in the RTC memory (survives the restart), the clock restarts,
@@ -5047,6 +5094,7 @@ void bootUpdateCheck() {  // called from setup() right after the LEDs are initia
   }
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("Update: no WiFi, update cancelled");
+    xt.updErr = -201; xt.updRssi = 0; writeXtConfig();  // [V16 CHANGE 3]
     return;
   }
   Serial.printf("Update: WiFi connected, free heap %u, largest block %u\n", ESP.getFreeHeap(), (unsigned)ESP.getMaxFreeBlockSize());

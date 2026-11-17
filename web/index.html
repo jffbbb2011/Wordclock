@@ -7,6 +7,10 @@
 <link rel="icon" href="data:,">
 <title>WordClock Einstellungen</title>
 <!--
+  [V16 CHANGE 1] Tab Lauftexte now holds everything about the scrolling texts: on/off + interval of date / temperature / humidity sit in their own group
+  (above the style options), and the interval text is the group "Freitext" (on/off, interval, speed, text up to 80 characters = cfg.cusText). Tab Anzeige no longer has them.
+  [V16 CHANGE 2] The sensor GY-21 / HTU21D indicator moved into the status box (Zeit, RTC, Sensor, WLAN, Firmware).
+  [V16 CHANGE 3] Tab System > Update: warning when the WiFi signal is weak (yellow / red) and the error code of the last failed update (st.updErr).
   [V14 CHANGE 1] Tab Display: boot text 2 is now an INTERVAL TEXT (on/off, interval, speed) in the group "Anzeigen als Lauftext"; at startup only text 1 runs.
   [V14 CHANGE 2] Tab LEDs: ONE colour mode selector with 4 modes (single / rainbow / random / ambient). Rainbow: per word or per letter (cfg.rbSub);
   random: how often the colour changes (cfg.rndEvery); ambient: effect list moved here from tab Extras (cfg.amb). The colour picker only shows where it is used.
@@ -409,25 +413,7 @@ canvas.playcv{cursor:pointer}
               <label class="row" for="blink"><span class="rt"><b data-t="blink"></b><small data-t="blinkSub"></small></span><input type="checkbox" class="sw" id="blink" data-k="blink"></label>
             </div>
           </div>
-          <div class="group">
-            <h3 data-t="gInfo">Anzeigen als Lauftext</h3>
-            <div class="rows">
-              <label class="row" for="date"><span class="rt"><b data-t="date"></b><small data-t="dateSub"></small></span><input type="checkbox" class="sw" id="date" data-k="date"></label>
-              <div class="row"><span class="rt"><b data-t="interval"></b></span><span class="inline"><select class="ivsel" id="dateInt" data-k="dateInt" data-type="num"><option value="30">30 s</option><option value="60">1 min</option><option value="120">2 min</option><option value="300">5 min</option><option value="600">10 min</option><option value="900">15 min</option><option value="1800">30 min</option><option value="3600">1 h</option></select><button type="button" class="btn sm" data-now="date" data-t="showNow">Jetzt anzeigen</button></span></div>
-              <label class="row" for="temp"><span class="rt"><b data-t="temp"></b><small data-t="tempSub"></small></span><input type="checkbox" class="sw" id="temp" data-k="temp"></label>
-              <div class="row"><span class="rt"><b data-t="interval"></b></span><span class="inline"><select class="ivsel" id="tempInt" data-k="tempInt" data-type="num"><option value="30">30 s</option><option value="60">1 min</option><option value="120">2 min</option><option value="300">5 min</option><option value="600">10 min</option><option value="900">15 min</option><option value="1800">30 min</option><option value="3600">1 h</option></select><button type="button" class="btn sm" data-now="temp" data-t="showNow">Jetzt anzeigen</button></span></div>
-              <label class="row" for="hum"><span class="rt"><b data-t="hum"></b><small data-t="humSub"></small></span><input type="checkbox" class="sw" id="hum" data-k="hum"></label>
-              <div class="row"><span class="rt"><b data-t="interval"></b></span><span class="inline"><select class="ivsel" id="humInt" data-k="humInt" data-type="num"><option value="30">30 s</option><option value="60">1 min</option><option value="120">2 min</option><option value="300">5 min</option><option value="600">10 min</option><option value="900">15 min</option><option value="1800">30 min</option><option value="3600">1 h</option></select><button type="button" class="btn sm" data-now="hum" data-t="showNow">Jetzt anzeigen</button></span></div>
-              <!-- [V14 CHANGE 1] interval text = boot text 2 -->
-              <label class="row" for="cusOn"><span class="rt"><b data-t="cusTitle"></b><small data-t="cusSub"></small></span><input type="checkbox" class="sw" id="cusOn" data-k="cusOn"></label>
-              <div id="cusFields">
-                <div class="row"><span class="rt"><b data-t="interval"></b></span><span class="inline"><select class="ivsel" id="cusInt" data-k="cusInt" data-type="num"><option value="30">30 s</option><option value="60">1 min</option><option value="120">2 min</option><option value="300">5 min</option><option value="600">10 min</option><option value="900">15 min</option><option value="1800">30 min</option><option value="3600">1 h</option></select><button type="button" class="btn sm" data-now="cus" data-t="showNow">Jetzt anzeigen</button></span></div>
-                <div class="row"><span class="rt"><b data-t="cusText"></b></span><input type="text" id="boot2" class="mono" data-k="boot2" maxlength="20" spellcheck="false" autocapitalize="characters" style="max-width:12em"></div>
-                <div class="row"><span class="rt"><b data-t="speed"></b></span><span class="inline"><input type="range" id="cusSpeed" min="40" max="400" step="10" data-k="cusSpeed" data-type="num"><output id="cusSpeedOut" for="cusSpeed"></output></span></div>
-              </div>
-            </div>
-            <p class="hint" id="htuHint"></p>
-          </div>
+          <!-- [V16 CHANGE 1] the group "Anzeigen als Lauftext" moved to the tab Lauftexte -->
           <div class="group">
             <h3 data-t="gMin">Minuten-LEDs</h3>
             <div class="seg" role="radiogroup">
@@ -478,6 +464,10 @@ canvas.playcv{cursor:pointer}
           </div>
           <div class="group">
             <h3 data-t="gTxtDate"></h3>
+            <div class="rows">
+              <label class="row" for="date"><span class="rt"><b data-t="date"></b><small data-t="dateSub"></small></span><input type="checkbox" class="sw" id="date" data-k="date"></label>
+              <div class="row"><span class="rt"><b data-t="interval"></b></span><span class="inline"><select class="ivsel" id="dateInt" data-k="dateInt" data-type="num"><option value="30">30 s</option><option value="60">1 min</option><option value="120">2 min</option><option value="300">5 min</option><option value="600">10 min</option><option value="900">15 min</option><option value="1800">30 min</option><option value="3600">1 h</option></select><button type="button" class="btn sm" data-now="date" data-t="showNow">Jetzt anzeigen</button></span></div>
+            </div>
             <div class="seg" role="radiogroup">
               <input type="radio" name="txt_dateStyle" id="dateSt0" value="0" data-k="txt.dateStyle"><label for="dateSt0" data-t="sty0"></label>
               <input type="radio" name="txt_dateStyle" id="dateSt1" value="1" data-k="txt.dateStyle"><label for="dateSt1" data-t="sty1"></label>
@@ -492,6 +482,11 @@ canvas.playcv{cursor:pointer}
           </div>
           <div class="group">
             <h3 data-t="gTxtTemp"></h3>
+            <div class="rows">
+              <label class="row" for="temp"><span class="rt"><b data-t="temp"></b><small data-t="tempSub"></small></span><input type="checkbox" class="sw" id="temp" data-k="temp"></label>
+              <div class="row"><span class="rt"><b data-t="interval"></b></span><span class="inline"><select class="ivsel" id="tempInt" data-k="tempInt" data-type="num"><option value="30">30 s</option><option value="60">1 min</option><option value="120">2 min</option><option value="300">5 min</option><option value="600">10 min</option><option value="900">15 min</option><option value="1800">30 min</option><option value="3600">1 h</option></select><button type="button" class="btn sm" data-now="temp" data-t="showNow">Jetzt anzeigen</button></span></div>
+            </div>
+            <p class="hint" id="htuHint" hidden></p>
             <div class="seg" role="radiogroup">
               <input type="radio" name="txt_tempStyle" id="tempSt0" value="0" data-k="txt.tempStyle"><label for="tempSt0" data-t="sty0"></label>
               <input type="radio" name="txt_tempStyle" id="tempSt1" value="1" data-k="txt.tempStyle"><label for="tempSt1" data-t="sty1"></label>
@@ -506,6 +501,10 @@ canvas.playcv{cursor:pointer}
           </div>
           <div class="group">
             <h3 data-t="gTxtHum"></h3>
+            <div class="rows">
+              <label class="row" for="hum"><span class="rt"><b data-t="hum"></b><small data-t="humSub"></small></span><input type="checkbox" class="sw" id="hum" data-k="hum"></label>
+              <div class="row"><span class="rt"><b data-t="interval"></b></span><span class="inline"><select class="ivsel" id="humInt" data-k="humInt" data-type="num"><option value="30">30 s</option><option value="60">1 min</option><option value="120">2 min</option><option value="300">5 min</option><option value="600">10 min</option><option value="900">15 min</option><option value="1800">30 min</option><option value="3600">1 h</option></select><button type="button" class="btn sm" data-now="hum" data-t="showNow">Jetzt anzeigen</button></span></div>
+            </div>
             <div class="seg" role="radiogroup">
               <input type="radio" name="txt_humStyle" id="humSt0" value="0" data-k="txt.humStyle"><label for="humSt0" data-t="sty0"></label>
               <input type="radio" name="txt_humStyle" id="humSt1" value="1" data-k="txt.humStyle"><label for="humSt1" data-t="sty1"></label>
@@ -514,6 +513,21 @@ canvas.playcv{cursor:pointer}
             </div>
             <p class="hint" id="humStyleHint"></p>
             <div class="slider w"><label for="humSpeed" data-t="speed"></label><input type="range" id="humSpeed" min="40" max="400" step="10" data-k="txt.humSpeed" data-type="num"><output id="humSpeedOut" for="humSpeed"></output></div>
+          </div>
+          <div class="group">
+            <h3 data-t="gTxtCus">Freitext</h3>
+            <div class="rows">
+              <label class="row" for="cusOn"><span class="rt"><b data-t="cusTitle"></b><small data-t="cusSub"></small></span><input type="checkbox" class="sw" id="cusOn" data-k="cusOn"></label>
+              <div id="cusFields">
+                <div class="row"><span class="rt"><b data-t="interval"></b></span><span class="inline"><select class="ivsel" id="cusInt" data-k="cusInt" data-type="num"><option value="30">30 s</option><option value="60">1 min</option><option value="120">2 min</option><option value="300">5 min</option><option value="600">10 min</option><option value="900">15 min</option><option value="1800">30 min</option><option value="3600">1 h</option></select><button type="button" class="btn sm" data-now="cus" data-t="showNow">Jetzt anzeigen</button></span></div>
+                <div class="row"><span class="rt"><b data-t="speed"></b></span><span class="inline"><input type="range" id="cusSpeed" min="40" max="400" step="10" data-k="cusSpeed" data-type="num"><output id="cusSpeedOut" for="cusSpeed"></output></span></div>
+              </div>
+            </div>
+            <div class="field" id="cusTextField">
+              <label for="cusText" data-t="cusText"></label>
+              <input type="text" id="cusText" class="mono" data-k="cusText" maxlength="80" spellcheck="false" autocapitalize="characters" style="width:100%;max-width:34em">
+              <p class="hint" data-t="cusTextHint"></p>
+            </div>
           </div>
           <div class="group" id="holdGroup">
             <h3 data-t="gHold"></h3>
@@ -828,7 +842,7 @@ const mock = {
     night: 0, nightDays: [[22,6],[22,6],[22,6],[22,6],[23,6],[23,7],[22,6]],
     lang: 0, deSpecial: 0, blink: false, date: false, dateInt: 60, temp: false, tempInt: 300, hum: false, humInt: 300,
     txt: { dateStyle: 0, tempStyle: 0, humStyle: 0, dateSpeed: 150, tempSpeed: 150, humSpeed: 150, hold: 2000, tempDec: true, dateYear: true, dateSep: 0 },
-    bootText: true, boot1: "COMPANY", boot2: "NAME", cusOn: false, cusInt: 300, cusSpeed: 80, minMode: 0, minOrder: "3,4,1,2",
+    bootText: true, boot1: "COMPANY", boot2: "NAME", cusOn: false, cusInt: 300, cusSpeed: 80, cusText: "", minMode: 0, minOrder: "3,4,1,2",
     ledTest: true, setWlan: true, showIp: true,
     ntp: "de.pool.ntp.org", tz: "CET-1CEST,M3.5.0/02,M10.5.0/03",
     hostNum: 0, ping: { on: false, ips: ["192.168.178.56","0.0.0.0","0.0.0.0"], tries: 10, debug: false },
@@ -838,7 +852,7 @@ const mock = {
   },
   status: {
     version: "V6.1.0", chip: "ESP8266", ip: "192.168.178.50", mac: "A4:CF:12:3B:7E:01",
-    ssid: "Heimnetz", rssi: -58, ntpOk: true, ntpAgoMin: 12, rtc: true, rtcOk: true, htu: true, timeOk: true,
+    ssid: "Heimnetz", rssi: -58, updErr: 0, updRssi: 0, ntpOk: true, ntpAgoMin: 12, rtc: true, rtcOk: true, htu: true, timeOk: true,
     uptime: 3*86400 + 5*3600 + 12*60, heap: 36120, ledsOn: true, restPort: 55555, curColor: "#00ff00", rainbowSeed: 123456789,
     pinDefaults: { led: 12, sda: 4, scl: 5 }
   },
@@ -1029,6 +1043,7 @@ const T = {
     leds: "LEDs", tabLed: "LEDs", tabNight: "Nachtmodus", tabDisp: "Anzeige", tabTime: "Zeit", tabNet: "Netzwerk", tabSys: "System",
     simLabel: "Uhrzeit ausprobieren", now: "Jetzt",
     stTime: "Zeit", stRtc: "RTC", stWifi: "WLAN", stIp: "IP-Adresse", stFw: "Firmware",
+    stHtu: "Sensor", htuFound: "GY-21 / HTU21D gefunden", htuMissing: "GY-21 / HTU21D nicht gefunden", gTxtCus: "Freitext", cusTextHint: "Bis zu 80 Zeichen (A–Z, Ziffern, einfache Satzzeichen).", uWeak: "Das WLAN-Signal ist {s} ({r} dBm). Für ein sicheres Update die Uhr näher an den Router bringen (Signal grün, besser als -60 dBm).", uWeakConfirm: "Das WLAN-Signal ist schwach. Das Update kann fehlschlagen. Trotzdem installieren?", uLastErr: "Letztes Update fehlgeschlagen (Fehler {c}, Signal {r} dBm): {m}", uEnet: "Verbindung abgebrochen oder Zeitüberschreitung, meist wegen schwachem WLAN.", uEmem: "Zu wenig freier Speicher.", uEsrv: "GitHub hat die Datei nicht geliefert.", uEres: "Die Download-Adresse von GitHub konnte nicht aufgelöst werden.", uEoth: "Unbekannter Fehler.",
     ntpAgo: "NTP, vor {n} Min.", ntpNone: "Kein NTP", rtcOk: "DS3231 erkannt", rtcNo: "Nicht gefunden",
     faceOff: "LEDs ausgeschaltet", faceNightOff: "Nachtmodus: Display aus", faceNightDim: "Nachtmodus: gedimmt",
     gColor: "Farbe", gColorHint: "Gilt, solange der Farbmodus „Einfarbig“ ist.",
@@ -1256,6 +1271,7 @@ const T = {
     leds: "LEDs", tabLed: "LEDs", tabNight: "Night mode", tabDisp: "Display", tabTime: "Time", tabNet: "Network", tabSys: "System",
     simLabel: "Try a time", now: "Now",
     stTime: "Time", stRtc: "RTC", stWifi: "Wi-Fi", stIp: "IP address", stFw: "Firmware",
+    stHtu: "Sensor", htuFound: "GY-21 / HTU21D found", htuMissing: "GY-21 / HTU21D not found", gTxtCus: "Free text", cusTextHint: "Up to 80 characters (A–Z, digits, simple punctuation).", uWeak: "The WiFi signal is {s} ({r} dBm). For a safe update move the clock closer to the router (signal green, better than -60 dBm).", uWeakConfirm: "The WiFi signal is weak. The update may fail. Install anyway?", uLastErr: "Last update failed (error {c}, signal {r} dBm): {m}", uEnet: "Connection lost or timeout, usually caused by a weak WiFi signal.", uEmem: "Not enough free memory.", uEsrv: "GitHub did not deliver the file.", uEres: "The download address from GitHub could not be resolved.", uEoth: "Unknown error.",
     ntpAgo: "NTP, {n} min ago", ntpNone: "No NTP", rtcOk: "DS3231 found", rtcNo: "Not found",
     faceOff: "LEDs switched off", faceNightOff: "Night mode: display off", faceNightDim: "Night mode: dimmed",
     gColor: "Color", gColorHint: "Used while the color mode is “Single color”.",
@@ -1483,6 +1499,7 @@ const T = {
     leds: "LEDs", tabLed: "LEDs", tabNight: "Modo nocturno", tabDisp: "Pantalla", tabTime: "Hora", tabNet: "Red", tabSys: "Sistema",
     simLabel: "Probar una hora", now: "Ahora",
     stTime: "Hora", stRtc: "RTC", stWifi: "Wi-Fi", stIp: "Dirección IP", stFw: "Firmware",
+    stHtu: "Sensor", htuFound: "GY-21 / HTU21D encontrado", htuMissing: "GY-21 / HTU21D no encontrado", gTxtCus: "Texto libre", cusTextHint: "Hasta 80 caracteres (A–Z, cifras, signos simples).", uWeak: "La señal WiFi es {s} ({r} dBm). Para una actualización segura acerca el reloj al router (señal verde, mejor que -60 dBm).", uWeakConfirm: "La señal WiFi es débil. La actualización puede fallar. ¿Instalar de todos modos?", uLastErr: "La última actualización falló (error {c}, señal {r} dBm): {m}", uEnet: "Conexión interrumpida o tiempo agotado, normalmente por una señal WiFi débil.", uEmem: "Memoria libre insuficiente.", uEsrv: "GitHub no entregó el archivo.", uEres: "No se pudo resolver la dirección de descarga de GitHub.", uEoth: "Error desconocido.",
     ntpAgo: "NTP, hace {n} min", ntpNone: "Sin NTP", rtcOk: "DS3231 encontrado", rtcNo: "No encontrado",
     faceOff: "LEDs apagados", faceNightOff: "Modo nocturno: pantalla apagada", faceNightDim: "Modo nocturno: atenuado",
     gColor: "Color", gColorHint: "Se usa mientras el modo de color es «Color único».",
@@ -1993,7 +2010,7 @@ function renderDeps() {
   $("#colorGroup").hidden = !(cm === 0 || (cm === 3 && [3, 4, 8].includes(cfg.amb)));  // the picker only where the colour is used (ambient: breathing, sun, sparkle)
   $("#colorHint").hidden = cm !== 3; $("#colorHint").textContent = cm === 3 ? t("gColorHintAmb") : "";
   $("#rbHint").textContent = cm === 0 ? "" : t(cm === 1 && cfg.rbSub === 1 ? "rbHint1b" : cm === 2 && cfg.rndEvery !== 0 ? "rbHint2x" : "rbHint" + cm);
-  $("#cusFields").hidden = !cfg.cusOn;
+  $("#cusFields").hidden = !cfg.cusOn; $("#cusTextField").hidden = !cfg.cusOn;
   $("#cusSpeedOut").textContent = cfg.cusSpeed + " ms";
   // Night
   $("#nightHint").textContent = t("nHint" + cfg.night, { v: cfg.brightNight });
@@ -2017,7 +2034,7 @@ function renderDeps() {
   });
   $("#holdOut").textContent = (cfg.txt.hold / 1000).toFixed(1) + " s";
   $("#holdGroup").hidden = cfg.txt.dateStyle === 0 && cfg.txt.tempStyle === 0 && cfg.txt.humStyle === 0;
-  $("#htuHint").textContent = t(st.htu ? "htuOk" : "htuNo");
+  $("#htuHint").hidden = !!st.htu; $("#htuHint").textContent = st.htu ? "" : t("htuNo");  // [V16 CHANGE 2] only when the sensor is missing (the indicator is in the status box)
   $("#setWlanSub").textContent = t("setWlanSub", { v: cfg.lang !== 1 ? "SET WLAN" : "WIFI" });
   $("#minOrderField").hidden = cfg.minMode !== 2;
   // Time
@@ -2044,11 +2061,24 @@ function renderDeps() {
   if (cfg.update === 1) u.innerHTML = `<p class="hint">${t("uHint1")}</p><p><a href="http://${hostName().toLowerCase()}.local:2022/update" target="_blank" rel="noopener">http://${hostName().toLowerCase()}.local:2022/update</a><br><a href="http://${st.ip}:2022/update" target="_blank" rel="noopener">http://${st.ip}:2022/update</a></p>`;
   if (cfg.update === 2) {
     const again = `<button type="button" class="btn sm" id="recheckUpd">${t("uRecheck")}</button>`;
-    if (upd.state === "new") u.innerHTML = `<div class="inline"><p class="hint" style="color:var(--fg);font-weight:600">${t("uHint2New", { v: upd.latest })}</p><button type="button" class="btn primary sm" id="installUpd">${t("uInstall")}</button></div>`;
+    // [V16 CHANGE 3] weak signal (yellow / red): a failed download is likely
+    const weakNote = st.rssi <= -60 ? `<p class="hint"><span class="dot ${st.rssi > -72 ? "warn" : "bad"}"></span>${t("uWeak", { s: sigLabel(st.rssi), r: st.rssi })}</p>` : "";
+    if (upd.state === "new") u.innerHTML = `<div class="inline"><p class="hint" style="color:var(--fg);font-weight:600">${t("uHint2New", { v: upd.latest })}</p><button type="button" class="btn primary sm" id="installUpd">${t("uInstall")}</button></div>${weakNote}`;
     else if (upd.state === "ok") u.innerHTML = `<div class="inline"><p class="hint">${t("uHint2Ok", { v: st.version })}</p>${again}</div>`;
     else if (upd.state === "error") u.innerHTML = `<div class="inline"><p class="hint">${t(upd.err === "memory" ? "uErrMem" : "uErr")}</p>${again}</div>`;
     else u.innerHTML = `<p class="hint">${t("uChecking")}</p>`;
+    // [V16 CHANGE 3] error of the last failed update (the clock stores it)
+    if (st.updErr) u.innerHTML += `<p class="hint"><span class="dot bad"></span>${t("uLastErr", { c: st.updErr, r: st.updRssi, m: t(updErrKey(st.updErr)) })}</p>`;
   }
+}
+
+// [V16 CHANGE 3] helpers for the update area
+const sigLabel = r => r > -60 ? t("sigGood") : r > -72 ? t("sigOk") : t("sigBad");
+function updErrKey(c) {  // error code of the last failed update -> text
+  if ([-1, -4, -5, -11, -201].includes(c)) return "uEnet";   // connection / timeout / no WiFi
+  if ([-8, -100].includes(c)) return "uEmem";                // memory
+  if ([-101, -102, -103, -104].includes(c)) return "uEsrv";  // server answer
+  return c === -200 ? "uEres" : "uEoth";
 }
 
 function renderStatus() {
@@ -2058,6 +2088,7 @@ function renderStatus() {
   $("#statusList").innerHTML =
     row(t("stTime"), st.ntpOk ? t("ntpAgo", { n: st.ntpAgoMin }) : t("ntpNone"), st.ntpOk ? "ok" : "warn") +
     row(t("stRtc"), !st.rtc ? t("rtcNo") : st.rtcOk === false ? t("rtcBadShort") : t("rtcOk"), !st.rtc ? "bad" : st.rtcOk === false ? "warn" : "ok") +
+    row(t("stHtu"), st.htu ? t("htuFound") : t("htuMissing"), st.htu ? "ok" : "warn") +  // [V16 CHANGE 2]
     row(t("stWifi"), `${st.ssid}, ${sig}`, sigCls) +
     row(t("stFw"), `<span class="mono">${st.version}</span> · ${st.chip}`);
   $("#sourceList").innerHTML =
@@ -2112,7 +2143,7 @@ function setColorMode(m) {
 
 function onInput(e) {
   const el = e.target;
-  if (el.dataset.k === "boot1" || el.dataset.k === "boot2") el.value = el.value.toUpperCase().replace(/[^A-Z0-9 .,:!?+\/()&#@'\-]/g, "");
+  if (el.dataset.k === "boot1" || el.dataset.k === "boot2" || el.dataset.k === "cusText") el.value = el.value.toUpperCase().replace(/[^A-Z0-9 .,:!?+\/()&#@'\-]/g, "");
   if (el.id === "simTime") { simMin = Number(el.value); renderFace(); return; }
   if (el.id === "colorHex") {
     let v = el.value.trim(); if (v && v[0] !== "#") v = "#" + v;
@@ -2172,7 +2203,7 @@ function updateDirty() {
   const ch = changedKeys();
   $("#savebar").hidden = ch.length === 0;
   $("#dirtyText").textContent = ch.length === 1 ? t("dirty1") : t("dirtyN", { n: ch.length });
-  const tabOf = { led: ["color","rainbow","amb","rbSub","rndEvery","bright","brightNight","psu"], night: ["night","nightDays"], disp: ["lang","deSpecial","blink","date","dateInt","temp","tempInt","hum","humInt","bootText","boot1","boot2","cusOn","cusInt","cusSpeed","minMode","minOrder","ledTest","setWlan","showIp"], txt: ["txt","fx.greet"], time: ["ntp","tz"], net: ["hostNum","ping","rest"], sys: ["update","pins","layout","rowMirror","maxMA"], emoji: ["fx.emoji","fx.emojiInt","fx.emojiMode","fx.mask"], play: [], extra: [] };
+  const tabOf = { led: ["color","rainbow","amb","rbSub","rndEvery","bright","brightNight","psu"], night: ["night","nightDays"], disp: ["lang","deSpecial","blink","bootText","boot1","minMode","minOrder","ledTest","setWlan","showIp"], txt: ["txt","fx.greet","date","dateInt","temp","tempInt","hum","humInt","cusOn","cusInt","cusSpeed","cusText"], time: ["ntp","tz"], net: ["hostNum","ping","rest"], sys: ["update","pins","layout","rowMirror","maxMA"], emoji: ["fx.emoji","fx.emojiInt","fx.emojiMode","fx.mask"], play: [], extra: [] };
   $$("#tabs button").forEach(b => {
     const has = ch.some(k => tabOf[b.dataset.tab].includes(k) || tabOf[b.dataset.tab].includes(k.split(".")[0]));
     let d = b.querySelector(".tdot");
@@ -2471,6 +2502,7 @@ function wire() {
     }
     if (e.target.id === "recheckUpd") { checkUpdate(); return; }
     if (e.target.id === "installUpd") {
+      if (st.rssi <= -72 && !confirm(t("uWeakConfirm"))) return;  // [V16 CHANGE 3] red signal: ask first
       const b = e.target; b.disabled = true;
       try { await api.action("update"); toast(t("uStarted", { v: upd.latest })); if (!MOCK) setTimeout(() => location.reload(), 90000); }
       catch (err) { toast(t("actionErr")); b.disabled = false; }
@@ -2981,6 +3013,7 @@ async function init() {
     customEmo = (data.custom || []).concat(["", "", "", ""]).slice(0, 4);
     if (!cfg.txt) cfg.txt = { dateStyle: 0, tempStyle: 0, humStyle: 0, dateSpeed: 150, tempSpeed: 150, humSpeed: 150, hold: 2000, tempDec: true, dateYear: true, dateSep: 0 };  // older firmware
     if (cfg.amb === undefined) { cfg.amb = 0; cfg.rbSub = 0; cfg.rndEvery = 0; cfg.cusOn = false; cfg.cusInt = 300; cfg.cusSpeed = 80; }  // [V14] older firmware
+    if (cfg.cusText === undefined) cfg.cusText = cfg.boot2 || "";  // [V16] firmware before 6.2.0.8
     saved = clone(cfg);
   } catch (e) { toast(t("loadErr")); return; }
   L = ["de", "en", "es"][cfg.lang] || "de";
